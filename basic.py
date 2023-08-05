@@ -71,22 +71,20 @@ def prnt():
 
 @basic
 def b2():
-    _30.DIM.A1(6), A(3), B(3)
-    _40.RANDOMIZE;
-    Y = 0;
-    T = 255
-    _70.INPUT("Y/N"), AS
-    _90.IF(AS == "NO").THEN._150
-    _150.FOR.I = 1, TO, 3
-    _160.A[I] = INT(10 * RND)
-    _170.FOR.J = 1, TO, I - 1
-    _180.IF(A[i] == A[j]).THEN._160
-    _190.NEXT.J
-    _200.NEXT.I
-    _210.PRINT;
-    PRINT("O.K.  I HAVE A NUMBER IN MIND")
-    _220.FOR.I = 1, TO, 20
+    _30. DIM.A1(6), A(3), B(3)
+    _40. RANDOMIZE;Y = 0;T = 255
+    _70. INPUT("Y/N"); AS
+    _90. IF.AS = "NO".THEN._150
+    _150. FOR.I = 1, TO, 3
+    _160. A[I] = INT(10 * RND)
+    _170. FOR.J = 1, TO, I - 1
+    _180. IF.A[i] = A[j].THEN._160
+    _190. NEXT.J
+    _200. NEXT.I
+    _210. PRINT;PRINT("O.K.  I HAVE A NUMBER IN MIND")
+    _220. FOR.I = 1, TO, 20
+    _295. GOTO._320
 
 
 print('smoke_test pass:', smoke_test())
-prnt()
+#prnt()
