@@ -1,3 +1,5 @@
+Check out https://morioh.com/a/054ee76b0c43/extract-text-from-images-with-tesseract-ocr
+
 5  REM *** BAGLES NUMBER GUESSING GAME
 10 REM *** ORIGINAL SOURCE UNKNOWN BUT SUSPECTED TO BE LAWRENCE HALL
 i5 REM *** OF SCIENCE, U. C BERKELEY. MODIFIED FOR TIMESHARED-8
