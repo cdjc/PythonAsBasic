@@ -133,23 +133,47 @@ def process_basic_statement(node: Union[ast.Expr, ast.Assign]):
         pass
 
 
+re_line_no = re.compile(r'_([1-9][0-9]*)\.')
+re_tuple_line_no = re.compile(r'\(_([1-9][0-9]*)\..*\)')
+re_print_fn = re.compile(r"PRINT\('(.*)'\)")
+# TODO: Fix this for multidimensional arrays
+re_dim = re.compile(r'DIM\.[A-Z][0-9A-Z]*\([0-9]+\)(, [A-Z][0-9A-Z]*\([0-9]+\))*')
+re_assign = re.compile(r'[A-Z][0-9A-Z]*\ =\ (.*)')
+
 def rewrite_statement(node: ast.AST):
     line = ast.unparse(node)
 
     # strip off the line number if present
 
-    line_no_match = re.match(r'_([1-9][0-9]*)\.', line)
     line_no_str = None
-    if line_no_match:
+    if line_no_match := re_line_no.match(line):
         line_no_str = line_no_match.group(1)
         line = line[line_no_match.end():]
+    elif tuple_line_match := re_tuple_line_no.fullmatch(line):
+        line_no_str = tuple_line_match.group(1)
+        line = line[tuple_line_match.end(1)+1:-1]
+
 
     print(line_no_str,'->',line)
 
     if line == 'PRINT':
         new_line = 'print()'
-    elif match := re.fullmatch(r"PRINT\('(.*)'\)", line):
+    if line == 'RANDOMIZE':  # TODO: We should tweak this so we can run repeatable tests
+        new_line = 'pass'
+    elif match := re_print_fn.fullmatch(line):
         new_line = f"print('{match[1]}')"
+    elif match := re_dim.fullmatch(line):
+        # strip off the leading DIM.
+        line = line[4:]
+        var_list = re.findall(r'[A-Z][0-9A-Z]*', line)
+        dim_list = re.findall(r'\([1-9][0-9]*\)', line)
+        assert len(var_list) == len(dim_list)
+        var_str = ','.join(var_list)
+        dim_str = ','.join(f'[0]*{x}' for x in dim_list)
+        new_line = var_str + '=' + dim_str
+    elif match := re_assign.fullmatch(line):
+        # TODO: Translate assingment RHS
+        new_line = line
     else:
         raise Exception("Don't know this line: "+line)
 
@@ -177,6 +201,7 @@ def process_statements(root: ast.Module):
         nodes.extend(rewrite_statement(statement))
         #nodes.extend(process_basic_statement(statement))
     fn.body = nodes
+    print(ast.unparse(fn))
 
 
 def basic(fn: Callable) -> Callable:
@@ -184,8 +209,8 @@ def basic(fn: Callable) -> Callable:
     # peel off this decorator from the code.
     fn_source = source[source.find('\n') + 1:]
     root = ast.parse(fn_source)
-    print(ast.dump(root, indent=' '))
-    print(ast.unparse(root))
+    #print(ast.dump(root, indent=' '))
+    #print(ast.unparse(root))
 
     process_statements(root)
 
@@ -202,10 +227,16 @@ def prnt():
 
 @basic
 def print_here():
-    _10. PRINT("HERE")
-    _20 .PRINT
-    _30 .PRINT("THERE")
-    _40 .PRINT;PRINT("CHAIN")
+    #_10. PRINT("HERE")
+    #_20 .PRINT
+    #_30 .PRINT("THERE")
+    #_40 .PRINT;PRINT("CHAIN")
+    PRINT('F'._);PRINT('G')
+
+    _30. DIM.A1(6),A(3),B(3)
+    _40. RANDOMIZE;Y=0;T=255
+    #_70. INPUT("Y/N").AS
+
 
 #@basic
 def b2():
