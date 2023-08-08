@@ -1,5 +1,6 @@
 import ast
 import inspect
+import re
 import types
 from typing import Callable, Union
 
@@ -115,6 +116,7 @@ def m_bare_functioncall(node: ast.Expr):
 
 def process_basic_statement(node: Union[ast.Expr, ast.Assign]):
 
+    print('line:',ast.unparse(node))
     try:
         return m_single_statement(node)
     except UnexpectedASTNode:
@@ -131,6 +133,35 @@ def process_basic_statement(node: Union[ast.Expr, ast.Assign]):
         pass
 
 
+def rewrite_statement(node: ast.AST):
+    line = ast.unparse(node)
+
+    # strip off the line number if present
+
+    line_no_match = re.match(r'_([1-9][0-9]*)\.', line)
+    line_no_str = None
+    if line_no_match:
+        line_no_str = line_no_match.group(1)
+        line = line[line_no_match.end():]
+
+    print(line_no_str,'->',line)
+
+    if line == 'PRINT':
+        new_line = 'print()'
+    elif match := re.fullmatch(r"PRINT\('(.*)'\)", line):
+        new_line = f"print('{match[1]}')"
+    else:
+        raise Exception("Don't know this line: "+line)
+
+    print('NL',new_line)
+    new_module = ast.parse(new_line, __name__, mode='exec')
+    new_nodes = new_module.body
+    for new_node in new_nodes:
+        ast.copy_location(new_node, node)
+        ast.fix_missing_locations(new_node)
+    return new_nodes
+
+
 def process_statements(root: ast.Module):
     '''
     Process each statement for transformation
@@ -142,7 +173,9 @@ def process_statements(root: ast.Module):
     checkFunctionDef(fn)
     nodes = []
     for statement in fn.body:
-        nodes.extend(process_basic_statement(statement))
+        print('!',ast.unparse(statement))
+        nodes.extend(rewrite_statement(statement))
+        #nodes.extend(process_basic_statement(statement))
     fn.body = nodes
 
 
