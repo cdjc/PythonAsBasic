@@ -110,8 +110,21 @@ class InputTests(unittest.TestCase):
         self.assertEqual('One Two\n', f.getvalue())
 
 
+class IfTests(unittest.TestCase):
 
+    def test_if(self):
 
+        @basic
+        def if_stmt():
+            _10. A = 4
+            _20. IF(A == 4).THEN._40
+            _30. A = 3
+            _40. PRINT(A._)
+
+        with auto_inout() as f:
+            if_stmt()
+
+        self.assertEqual('4', f.getvalue())
 
 if __name__ == '__main__':
     unittest.main()

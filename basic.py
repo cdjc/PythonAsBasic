@@ -276,7 +276,7 @@ def prnt():
     #print()
     #_20. PRINT("here")
 
-#@basic
+@basic
 def print_here():
     #_10. PRINT("HERE")
     #_20 .PRINT
