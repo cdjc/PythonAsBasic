@@ -1,6 +1,8 @@
 import ast
 import inspect
+import io
 import re
+import sys
 import types
 from typing import Callable, Union
 
@@ -133,20 +135,30 @@ def process_basic_statement(node: Union[ast.Expr, ast.Assign]):
         pass
 
 
-re_line_no = re.compile(r'_([1-9][0-9]*)\.')
+re_line_no = re.compile(r'_[1-9][0-9]*')
+re_line_no_prefix = re.compile(r'_([1-9][0-9]*)\.')
 re_tuple_line_no = re.compile(r'\(_([1-9][0-9]*)\..*\)')
-re_print_fn = re.compile(r"PRINT\('(.*)'\)")
+re_print_fn = re.compile(r"PRINT\('(.*)'(\.\_)?\)")
 # TODO: Fix this for multidimensional arrays
 re_dim = re.compile(r'DIM\.[A-Z][0-9A-Z]*\([0-9]+\)(, [A-Z][0-9A-Z]*\([0-9]+\))*')
 re_assign = re.compile(r'[A-Z][0-9A-Z]*\ =\ (.*)')
+re_input_var = re.compile(r"INPUT\('(.*)'\)\.([A-Z][0-9A-Z]*)")
+re_if_stmt = re.compile(r"IF\((?P<expr>.*)\)\.THEN\.(?P<stmt>.*)")
 
+# expression rewriting
+re_left_fn = re.compile(r'LEFT\(\s*(?P<var>[A-Z][A-Z0-9]*)\s*,\s*(?P<len>\d+\s*)\)')
+
+def rewrite_expression(line: str):
+    line = re_left_fn.sub(lambda m: f'{m.group("var")}[:{m.group("len")}]', line)  # LEFT(A, 2) -> A[:2]
+    print('line',line)
+    return line
 def rewrite_statement(node: ast.AST):
     line = ast.unparse(node)
 
     # strip off the line number if present
 
     line_no_str = None
-    if line_no_match := re_line_no.match(line):
+    if line_no_match := re_line_no_prefix.match(line):
         line_no_str = line_no_match.group(1)
         line = line[line_no_match.end():]
     elif tuple_line_match := re_tuple_line_no.fullmatch(line):
@@ -161,7 +173,8 @@ def rewrite_statement(node: ast.AST):
     if line == 'RANDOMIZE':  # TODO: We should tweak this so we can run repeatable tests
         new_line = 'pass'
     elif match := re_print_fn.fullmatch(line):
-        new_line = f"print('{match[1]}')"
+        end = "''" if match[2] else r"'\n'"
+        new_line = f"print('{match[1]}', end={end})"
     elif match := re_dim.fullmatch(line):
         # strip off the leading DIM.
         line = line[4:]
@@ -172,8 +185,17 @@ def rewrite_statement(node: ast.AST):
         dim_str = ','.join(f'[0]*{x}' for x in dim_list)
         new_line = var_str + '=' + dim_str
     elif match := re_assign.fullmatch(line):
-        # TODO: Translate assingment RHS
+        # TODO: Translate assignment RHS?
         new_line = line
+    elif match := re_input_var.fullmatch(line):
+        new_line = f"print('{match[1]}', end=' ');{match[2]} = input()"
+    elif match := re_if_stmt.fullmatch(line):
+        exp = match.group('expr')
+        stmt = match.group('stmt')
+        exp = rewrite_expression(exp)
+        if line_no := re_line_no.fullmatch(stmt):
+            stmt = f'GOTO.{line_no[0]}'
+        new_line = f'if {exp}:\n    {stmt}'
     else:
         raise Exception("Don't know this line: "+line)
 
@@ -219,6 +241,18 @@ def basic(fn: Callable) -> Callable:
     return types.FunctionType(function_code, fn.__globals__)
 
 
+class auto_input:
+    def __init__(self, text: str):
+        self.buffer = io.StringIO(text)
+
+    def __enter__(self):
+        self.old_stdin = sys.stdin
+        sys.stdin = self.buffer
+
+    def __exit__(self, *_):
+        sys.stdin = self.old_stdin
+
+
 # @basic
 def prnt():
     _10. PRINT
@@ -235,7 +269,9 @@ def print_here():
 
     _30. DIM.A1(6),A(3),B(3)
     _40. RANDOMIZE;Y=0;T=255
-    #_70. INPUT("Y/N").AS
+    _70. INPUT("Y/N").AS
+    _90. IF(LEFT(AS, 1) == "N").THEN._150
+    #_150. FOR.I=1, TO, 3
 
 
 #@basic
@@ -246,6 +282,7 @@ def b2():
     _90. IF.AS = "NO".THEN._150
     _150. FOR.I = 1, TO, 3
     _160. A[I] = INT(10 * RND)
+    _165. IF(I - 1 == 0).THEN._200
     _170. FOR.J = 1, TO, I - 1
     _180. IF.A[i] = A[j].THEN._160
     _190. NEXT.J
@@ -256,5 +293,7 @@ def b2():
 
 
 
+
 #prnt()
-print_here()
+with auto_input("Y\n"):
+    print_here()
