@@ -138,11 +138,12 @@ def process_basic_statement(node: Union[ast.Expr, ast.Assign]):
 re_line_no = re.compile(r'_[1-9][0-9]*')
 re_line_no_prefix = re.compile(r'_([1-9][0-9]*)\.')
 re_tuple_line_no = re.compile(r'\(_([1-9][0-9]*)\..*\)')
-re_print_fn = re.compile(r"PRINT\('(.*)'(\.\_)?\)")
+#re_print_fn = re.compile(r"PRINT\('(.*)'(\.\_)?\)")
+re_print_fn = re.compile(r"PRINT\((.*)\)")
 # TODO: Fix this for multidimensional arrays
 re_dim = re.compile(r'DIM\.[A-Z][0-9A-Z]*\([0-9]+\)(, [A-Z][0-9A-Z]*\([0-9]+\))*')
 re_assign = re.compile(r'[A-Z][0-9A-Z]*\ =\ (.*)')
-re_input_var = re.compile(r"INPUT\('(.*)'\)\.([A-Z][0-9A-Z]*)")
+re_input_var = re.compile(r"INPUT(\('(.*)'\))?\.([A-Z][0-9A-Z]*)")
 re_if_stmt = re.compile(r"IF\((?P<expr>.*)\)\.THEN\.(?P<stmt>.*)")
 
 # expression rewriting
@@ -170,11 +171,18 @@ def rewrite_statement(node: ast.AST):
 
     if line == 'PRINT':
         new_line = 'print()'
-    if line == 'RANDOMIZE':  # TODO: We should tweak this so we can run repeatable tests
+    elif line == 'RANDOMIZE':  # TODO: We should tweak this so we can run repeatable tests
         new_line = 'pass'
     elif match := re_print_fn.fullmatch(line):
-        end = "''" if match[2] else r"'\n'"
-        new_line = f"print('{match[1]}', end={end})"
+        exp = match[1]
+        noln = exp[-2:] == '._'
+        if noln:
+            exp = exp[:-2]
+            end = "''"
+        else:
+            end = r"'\n'"
+        exp = rewrite_expression(exp)
+        new_line = f"print({exp}, end={end})"
     elif match := re_dim.fullmatch(line):
         # strip off the leading DIM.
         line = line[4:]
@@ -188,7 +196,10 @@ def rewrite_statement(node: ast.AST):
         # TODO: Translate assignment RHS?
         new_line = line
     elif match := re_input_var.fullmatch(line):
-        new_line = f"print('{match[1]}', end=' ');{match[2]} = input()"
+        if match[2]:
+            new_line = f"print('{match[2]}', end=' ');{match[3]} = input()"
+        else:
+            new_line = f'{match[3]} = input()'
     elif match := re_if_stmt.fullmatch(line):
         exp = match.group('expr')
         stmt = match.group('stmt')
@@ -230,6 +241,12 @@ def basic(fn: Callable) -> Callable:
     source = inspect.getsource(fn)
     # peel off this decorator from the code.
     fn_source = source[source.find('\n') + 1:]
+
+    indent = fn_source.find('def')
+    fn_source = '\n'.join(x[indent:] for x in fn_source.split('\n'))
+
+    print('-'*8)
+    print(fn_source)
     root = ast.parse(fn_source)
     #print(ast.dump(root, indent=' '))
     #print(ast.unparse(root))
@@ -259,7 +276,7 @@ def prnt():
     #print()
     #_20. PRINT("here")
 
-@basic
+#@basic
 def print_here():
     #_10. PRINT("HERE")
     #_20 .PRINT
@@ -295,5 +312,5 @@ def b2():
 
 
 #prnt()
-with auto_input("Y\n"):
-    print_here()
+#with auto_input("Y\n"):
+#    print_here()
