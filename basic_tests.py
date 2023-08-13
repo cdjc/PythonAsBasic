@@ -126,5 +126,19 @@ class IfTests(unittest.TestCase):
 
         self.assertEqual('4', f.getvalue())
 
+    def test_if_back(self):
+
+        @basic
+        def if_back():
+            _10. A = 1
+            _20. A = A + 1
+            _30. IF(A < 5).THEN.GOTO._20
+            _40. PRINT(A)
+
+        with auto_inout() as f:
+            if_back()
+
+        self.assertEqual('5\n', f.getvalue())
+
 if __name__ == '__main__':
     unittest.main()

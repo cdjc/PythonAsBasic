@@ -5,6 +5,7 @@ import re
 import sys
 import types
 from typing import Callable, Union
+from goto import goto
 
 
 class UnexpectedASTNode(Exception):
@@ -136,8 +137,8 @@ def process_basic_statement(node: Union[ast.Expr, ast.Assign]):
 
 
 re_line_no = re.compile(r'_[1-9][0-9]*')
-re_line_no_prefix = re.compile(r'_([1-9][0-9]*)\.')
-re_tuple_line_no = re.compile(r'\(_([1-9][0-9]*)\..*\)')
+re_line_no_prefix = re.compile(r'(_[1-9][0-9]*)\.')
+re_tuple_line_no = re.compile(r'\((_[1-9][0-9]*)\..*\)')
 #re_print_fn = re.compile(r"PRINT\('(.*)'(\.\_)?\)")
 re_print_fn = re.compile(r"PRINT\((.*)\)")
 # TODO: Fix this for multidimensional arrays
@@ -151,7 +152,7 @@ re_left_fn = re.compile(r'LEFT\(\s*(?P<var>[A-Z][A-Z0-9]*)\s*,\s*(?P<len>\d+\s*)
 
 def rewrite_expression(line: str):
     line = re_left_fn.sub(lambda m: f'{m.group("var")}[:{m.group("len")}]', line)  # LEFT(A, 2) -> A[:2]
-    print('line',line)
+    print('expr',line)
     return line
 def rewrite_statement(node: ast.AST):
     line = ast.unparse(node)
@@ -210,7 +211,10 @@ def rewrite_statement(node: ast.AST):
     else:
         raise Exception("Don't know this line: "+line)
 
-    print('NL',new_line)
+    if line_no_str:
+        new_line = 'label .'+line_no_str+'\n'+new_line
+    # print('NL',new_line)
+
     new_module = ast.parse(new_line, __name__, mode='exec')
     new_nodes = new_module.body
     for new_node in new_nodes:
@@ -230,7 +234,7 @@ def process_statements(root: ast.Module):
     checkFunctionDef(fn)
     nodes = []
     for statement in fn.body:
-        print('!',ast.unparse(statement))
+        #print('!',ast.unparse(statement))
         nodes.extend(rewrite_statement(statement))
         #nodes.extend(process_basic_statement(statement))
     fn.body = nodes
@@ -253,9 +257,14 @@ def basic(fn: Callable) -> Callable:
 
     process_statements(root)
 
+    # print('-'*8)
+    # print(ast.unparse(root))
+
     module_code = compile(root, fn.__code__.co_filename, mode='exec')
     function_code = module_code.co_consts[0]  # The function is the first thing in the "module"
-    return types.FunctionType(function_code, fn.__globals__)
+    fn = types.FunctionType(function_code, fn.__globals__)
+    fn = goto(fn)
+    return fn
 
 
 class auto_input:
@@ -270,47 +279,48 @@ class auto_input:
         sys.stdin = self.old_stdin
 
 
-# @basic
-def prnt():
-    _10. PRINT
-    #print()
-    #_20. PRINT("here")
+if __name__ == '__main__':
+    # @basic
+    def prnt():
+        _10. PRINT
+        #print()
+        #_20. PRINT("here")
 
-@basic
-def print_here():
-    #_10. PRINT("HERE")
-    #_20 .PRINT
-    #_30 .PRINT("THERE")
-    #_40 .PRINT;PRINT("CHAIN")
-    PRINT('F'._);PRINT('G')
+    @basic
+    def print_here():
+        #_10. PRINT("HERE")
+        #_20 .PRINT
+        #_30 .PRINT("THERE")
+        #_40 .PRINT;PRINT("CHAIN")
+        PRINT('F'._);PRINT('G')
 
-    _30. DIM.A1(6),A(3),B(3)
-    _40. RANDOMIZE;Y=0;T=255
-    _70. INPUT("Y/N").AS
-    _90. IF(LEFT(AS, 1) == "N").THEN._150
-    #_150. FOR.I=1, TO, 3
-
-
-#@basic
-def b2():
-    _30. DIM.A1(6), A(3), B(3)
-    _40. RANDOMIZE;Y = 0;T = 255
-    _70. INPUT("Y/N"); AS
-    _90. IF.AS = "NO".THEN._150
-    _150. FOR.I = 1, TO, 3
-    _160. A[I] = INT(10 * RND)
-    _165. IF(I - 1 == 0).THEN._200
-    _170. FOR.J = 1, TO, I - 1
-    _180. IF.A[i] = A[j].THEN._160
-    _190. NEXT.J
-    _200. NEXT.I
-    _210. PRINT;PRINT("O.K.  I HAVE A NUMBER IN MIND")
-    _220. FOR.I = 1, TO, 20
-    _295. GOTO._320
+        _30. DIM.A1(6),A(3),B(3)
+        _40. RANDOMIZE;Y=0;T=255
+        _70. INPUT("Y/N").AS
+        _90. IF(LEFT(AS, 1) == "N").THEN._150
+        #_150. FOR.I=1, TO, 3
 
 
+    #@basic
+    def b2():
+        _30. DIM.A1(6), A(3), B(3)
+        _40. RANDOMIZE;Y = 0;T = 255
+        _70. INPUT("Y/N"); AS
+        _90. IF.AS = "NO".THEN._150
+        _150. FOR.I = 1, TO, 3
+        _160. A[I] = INT(10 * RND)
+        _165. IF(I - 1 == 0).THEN._200
+        _170. FOR.J = 1, TO, I - 1
+        _180. IF.A[i] = A[j].THEN._160
+        _190. NEXT.J
+        _200. NEXT.I
+        _210. PRINT;PRINT("O.K.  I HAVE A NUMBER IN MIND")
+        _220. FOR.I = 1, TO, 20
+        _295. GOTO._320
 
 
-#prnt()
-#with auto_input("Y\n"):
-#    print_here()
+
+
+    #prnt()
+    #with auto_input("Y\n"):
+    #    print_here()
