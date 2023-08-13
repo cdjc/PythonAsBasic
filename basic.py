@@ -208,6 +208,11 @@ def rewrite_statement(node: ast.AST):
         if line_no := re_line_no.fullmatch(stmt):
             stmt = f'GOTO.{line_no[0]}'
         new_line = f'if {exp}:\n    {stmt}'
+
+        # FOR statement calcs:
+        # FOR I = X TO Y STEP Z
+        # [x*Z for x in range(X, int(round(Y/Z)))]
+        # See also https://stackoverflow.com/questions/477486/how-do-i-use-a-decimal-step-value-for-range
     else:
         raise Exception("Don't know this line: "+line)
 
