@@ -1,6 +1,7 @@
 import ast
 import inspect
 import io
+import random
 import re
 import sys
 import types
@@ -45,11 +46,13 @@ re_input_var = re.compile(r"INPUT(\('(.*)'\))?\.([A-Z][0-9A-Z]*)")
 re_if_stmt = re.compile(r"IF\((?P<expr>.*)\)\.THEN\.(?P<stmt>.*)")
 # TODO Add step to FOR
 re_for_stmt = re.compile(r"FOR\.(?P<var>[A-Z][A-Z0-9]*)\s*=\s*\((?P<expr_from>.*),\s*TO,\s*(?P<expr_to>.*)\)")
-re_next_stmt = re.compile(f'NEXT\.[A-Z][A-Z0-9]*')
+re_next_stmt = re.compile(r'NEXT\.[A-Z][A-Z0-9]*')
+re_goto_stmt = re.compile(r'GOTO\._[1-9][0-9]*')
 
 # expression rewriting
 re_left_fn = re.compile(r'LEFT\(\s*(?P<var>[A-Z][A-Z0-9]*)\s*,\s*(?P<len>\d+\s*)\)')
 re_rand_fn = re.compile(r'RND\([0-9]*\)')
+re_mid_fn = re.compile(r'MID\((?P<expr_str>.*),(?P<expr_start>.*), (?P<expr_end>.*)\)')
 
 
 for_stack = []
@@ -57,7 +60,10 @@ for_counter = 0
 def rewrite_expression(line: str):
     line = re_left_fn.sub(lambda m: f'{m.group("var")}[:{m.group("len")}]', line)  # LEFT(A, 2) -> A[:2]
     line = line.replace('INT(', 'int(')
+    line = line.replace('LEN(', 'len(')
+    line = line.replace('ASC(', 'ord(')
     line = re_rand_fn.sub('random.random()', line)
+    #if match := re_mid_fn
     print('expr',line)
     return line
 def rewrite_statement(node: ast.AST):
@@ -125,7 +131,7 @@ def rewrite_statement(node: ast.AST):
         stmt = match.group('stmt')
         exp = rewrite_expression(exp)
         if line_no := re_line_no.fullmatch(stmt):
-            stmt = f'GOTO.{line_no[0]}'
+            stmt = f'goto.{line_no[0]}'
         new_line = f'if {exp}:\n    {stmt}'
     elif match := re_for_stmt.fullmatch(line):
         # FOR statement calcs:
@@ -178,6 +184,8 @@ def rewrite_statement(node: ast.AST):
         line_end = f'label .{post_for_label}'
 
         new_line = '\n'.join((line_incr, line_goto, line_end))
+    elif match := re_goto_stmt.fullmatch(line):
+        new_line = line.replace('GOTO', 'goto')
     else:
         raise Exception("Don't know this line: "+line)
 
@@ -251,12 +259,15 @@ def basic(fn: Callable) -> Callable:
 
 
 class auto_input:
-    def __init__(self, text: str):
+    def __init__(self, text: str, seed: int = None):
         self.buffer = io.StringIO(text)
+        self.seed = seed
 
     def __enter__(self):
         self.old_stdin = sys.stdin
         sys.stdin = self.buffer
+        if self.seed:
+            random.seed(self.seed)
 
     def __exit__(self, *_):
         sys.stdin = self.old_stdin
@@ -298,8 +309,16 @@ if __name__ == '__main__':
         _180. IF(A[I] == A[J]).THEN._160
         _190. NEXT.J
         _200. NEXT.I
-        _210. PRINT(A[1], A[2], A[3])
-        _220. PRINT('DONE')
+        _205. PRINT(A[1], A[2], A[3])
+        #_220. PRINT('DONE')
+        _210. PRINT;PRINT("O.K.  I HAVE A NUMBER IN MIND.")
+        _220. FOR.I=1, TO, 20
+        _230. PRINT("GUESS #",I._)
+        _240. INPUT.AS
+        _245. IF(LEN(AS)!=3).THEN._630
+        _250. FOR.Z=1,TO,3;A1[Z]=ASC(MID(AS,Z,1));NEXT.Z
+        _605. NEXT.I
+        _630. PRINT("TRY GUESSING A THREE-DIGIT NUMBER.");GOTO._230
 
 
     #@basic
@@ -324,7 +343,7 @@ if __name__ == '__main__':
 
 
     #prnt()
-    with auto_input("Y\n"):
+    with auto_input("Y\n933\n", seed=1234):
         pass
         #prnt()
         print_here()

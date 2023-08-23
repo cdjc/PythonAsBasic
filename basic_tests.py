@@ -95,7 +95,7 @@ class InputTests(unittest.TestCase):
         with auto_inout('in1') as f:
             input_bare()
 
-        self.assertEqual('in1\n', f.getvalue())
+        self.assertEqual('\nin1\n', f.getvalue())
 
     def test_input_prompt(self):
 
@@ -107,7 +107,7 @@ class InputTests(unittest.TestCase):
         with auto_inout('Two') as f:
             input_bare()
 
-        self.assertEqual('One Two\n', f.getvalue())
+        self.assertEqual('One \nTwo\n', f.getvalue())
 
 
 class IfTests(unittest.TestCase):
@@ -139,6 +139,39 @@ class IfTests(unittest.TestCase):
             if_back()
 
         self.assertEqual('5\n', f.getvalue())
+
+
+class ForTests(unittest.TestCase):
+
+    def test_simple_for(self):
+
+        @basic
+        def simple_for():
+            _10. FOR.I=1, TO,3
+            _20. PRINT(I._)
+            _30. NEXT.I
+
+        with auto_inout() as f:
+            simple_for()
+
+        self.assertEqual('123', f.getvalue())
+
+    def test_nested_for(self):
+        @basic
+        def nested_for():
+            _10.FOR.I = 1, TO, 2
+            _20.FOR.J = 4, TO, 5
+            _22. PRINT(I,J)
+            _25. NEXT.J
+            _30.NEXT.I
+
+        with auto_inout() as f:
+            nested_for()
+
+        self.assertEqual('1 4\n1 5\n2 4\n2 5\n', f.getvalue())
+
+    # TODO: Add tests for error conditions
+
 
 if __name__ == '__main__':
     unittest.main()
