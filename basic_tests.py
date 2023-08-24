@@ -57,7 +57,7 @@ class PrintTests(unittest.TestCase):
         with auto_inout() as f:
             print_string()
 
-        self.assertEqual('foo', f.getvalue())
+        self.assertEqual('foo ', f.getvalue())
 
 
     def test_print_num(self):
@@ -124,7 +124,7 @@ class IfTests(unittest.TestCase):
         with auto_inout() as f:
             if_stmt()
 
-        self.assertEqual('4', f.getvalue())
+        self.assertEqual('4 ', f.getvalue())
 
     def test_if_back(self):
 
@@ -154,7 +154,7 @@ class ForTests(unittest.TestCase):
         with auto_inout() as f:
             simple_for()
 
-        self.assertEqual('123', f.getvalue())
+        self.assertEqual('1 2 3 ', f.getvalue())
 
     def test_nested_for(self):
         @basic
