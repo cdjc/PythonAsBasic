@@ -1,9 +1,9 @@
 from basic import basic
-
+from basic_functions import *
 
 @basic
 def bagels():
-
+    _5.PRINT(TAB(33),"BAGELS")
     _30.DIM.A1(6), A(3), B(3)
     _40.Y = 0;
     T = 255
@@ -73,7 +73,7 @@ def bagels():
     _600.PRINT
     _605.NEXT.I
     _610.PRINT("OH WELL.")
-    _615.PRINT("THAT'S TWNETY GUESSES.  MY NUMBER WAS", 100 * A(1) + 10 * A(2) + A(3))
+    _615.PRINT("THAT'S TWENTY GUESSES.  MY NUMBER WAS", 100 * A(1) + 10 * A(2) + A(3))
     _620.GOTO._700
     _630.PRINT("TRY GUESSING A THREE-DIGIT NUMBER.");
     GOTO._230

@@ -55,10 +55,11 @@ re_rand_fn = re.compile(r'RND\([0-9]*\)')
 re_mid_fn = re.compile(r'MID\((?P<expr_str>.*),(?P<expr_start>.*), (?P<expr_end>.*)\)')
 
 
+
 for_stack = []
 for_counter = 0
 def rewrite_expression(line: str):
-    line = re_left_fn.sub(lambda m: f'{m.group("var")}[:{m.group("len")}]', line)  # LEFT(A, 2) -> A[:2]
+    #line = re_left_fn.sub(lambda m: f'{m.group("var")}[:{m.group("len")}]', line)  # LEFT(A, 2) -> A[:2]
     line = line.replace('INT(', 'int(')
     line = line.replace('LEN(', 'len(')
     line = line.replace('ASC(', 'ord(')
@@ -273,10 +274,14 @@ class auto_input:
 
 if __name__ == '__main__':
 
-    #@basic
+    @basic
     def prnt():
         _10. FOR.I=1,TO,2
         _15. FOR.J=4,TO,5
         _20. PRINT(I,J)
         _40. NEXT.J
         _30. NEXT.I
+        _45. A="ABC"
+        _50. PRINT(LEFT("ABC", 2))
+
+    prnt()
