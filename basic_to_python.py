@@ -4,18 +4,6 @@ from dataclasses import dataclass
 from enum import Enum, auto
 import re
 
-# Type = Enum('Type', [
-#     'String',
-#     'Integer',
-#     'Float',
-#     'Variable',
-#     'Keyword',
-#     'Function',
-#     'Symbol',
-#     'Separator',  # :
-#     'Comment'
-# ])
-
 class Type(Enum):
     String = auto()
     Integer = auto()
@@ -41,23 +29,25 @@ StrFunction = Enum('StrFunction', [
     'MID',
 ])
 
-Keyword = Enum('Keyword', [
-    'PRINT',
-    'IF',
-    'THEN',
-    'FOR',
-    'TO',
-    'STEP',
-    'NEXT',
-    'DIM',
-    'INPUT',
-    'GOTO',
-    'END'
-])
+class Keyword(Enum):
+    PRINT = auto()
+    IF = auto()
+    THEN = auto()
+    FOR = auto()
+    TO = auto()
+    STEP = auto()
+    NEXT = auto()
+    DIM = auto()
+    INPUT = auto()
+    GOTO = auto()
+    END = auto()
+
 
 int_function_dict = {x.name:x.value for x in IntFunction}
 str_function_dict = {x.name:x.value for x in StrFunction}
 keyword_dict = {x.name:x.value for x in Keyword}
+
+arrays_set = set()  # set for remembering arrays. TODO: Only 1 dimension allowed for now
 
 @dataclass
 class Token:
@@ -179,14 +169,84 @@ def separate_token_lines(tokens):
             lines[-1].append(token)
     return lines
 
-def translate_tokens(tokens: list[Token]):
+def translate_print(tokens: list[Token]) -> str:
+    '''
+    PRINT statement. Options:
+    PRINT
+    PRINT "FOO"
+    PRINT "GUESS #";I,    (; joins with a space and supresses new line at the end)
+    a trailing comma jumps to next TAB stop (every 10 chars on C64 I think: https://www.c64-wiki.com/wiki/PRINT ).
+    '''
+    rval = 'PRINT('
+    element_count = 0
+    in_expression = False
+    no_new_line = tokens[-1].tok_type == Type.Symbol and tokens[-1].str_value in ',;'
+    if no_new_line:
+        tokens = tokens[:-1]  # strip the trailing comma
+    for i, token in enumerate(tokens):
+        if i == 0:
+            assert token.tok_type == Type.Keyword and token.str_value == Keyword.PRINT.name
+            continue
+        elif token.tok_type == Type.String:
+            # if element_count > 0:
+            #     rval += " + "
+            rval += '"'+token.str_value+'"'
+            in_expression = False
+            element_count += 1
+            continue
+        elif token.tok_type == Type.Symbol and token.str_value == ';':
+            if in_expression:
+                rval += ')'
+                in_expression = False
+            rval += ", "
+            continue
+        else:
+            if not in_expression:
+                in_expression = True
+                element_count += 1
+            rval += token.str_value
+
+    if no_new_line:
+        rval += '._'
+    # if element_count > 1:
+    #     rval += ', sep=" "'
+    rval += ')'
+    #print('#######', rval)
+    return rval
+
+def translate_dim(tokens: list[Token]) -> str:
+    '''
+    DIM A1(6),A(3),B(3)
+    becomes
+    DIM.A1(6), A(3), B(3)
+    '''
+    rval = 'DIM.'
+    rval += ''.join([x.str_value for x in tokens[1:]])
+    arrays_set.update([x.str_value for x in tokens[1:] if x.tok_type == Type.Variable])
+    #print(arrays_set)
+    #print(tokens)
+    return rval
+
+def translate_tokens(tokens: list[Token]) -> str:
     rval = ''
     for i, token in enumerate(tokens):
         # line number
         if i == 0 and tokens[0].tok_type == Type.Integer:
             rval += '_'+tokens[0].str_value+". "
             continue
-
+        elif token.tok_type == Type.Keyword and token.str_value == Keyword.PRINT.name:
+            rval += translate_print(tokens[i:])
+            break
+        elif token.tok_type == Type.Comment:
+            rval += "REM # "+token.str_value
+            break
+        elif token.tok_type == Type.Keyword and token.str_value == Keyword.DIM.name:
+            rval += translate_dim(tokens[i:])
+            break
+        else:
+            print(tokens)
+            break
+    return rval
 
 
 def translate_basic_line(raw_line: str) -> list[str]:
@@ -194,7 +254,8 @@ def translate_basic_line(raw_line: str) -> list[str]:
 
     token_lines = separate_token_lines(tokens)
     for line in token_lines:
-        print(line)
+        #print(line)
+        new_line = translate_tokens(line)
 
 
 def read_basic(basic_lines: list[str]) -> list[str]:
