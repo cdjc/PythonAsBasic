@@ -15,6 +15,10 @@ class TestTranslate(unittest.TestCase):
         self.assertEqual("A=5", translate_assignment(tokenise("A=5")))
         self.assertEqual("A[I]=INT(10*RND(1))", translate_assignment(tokenise("A(I)=INT(10*RND(1))")))
         self.assertEqual("A[5+B[C+(2*3)-1]+Z[5]]=0", translate_assignment(tokenise("A(5+B(C+(2*3)-1)+Z(5)) = 0")))
+        with self.assertRaises(SyntaxError):
+            translate_assignment(tokenise("A=(5))"))
+        with self.assertRaises(SyntaxError):
+            translate_assignment(tokenise("A=(5"))
 
 
 if __name__ == '__main__':

@@ -305,13 +305,15 @@ def translate_assignment(tokens: list[Token]) -> str:
                 stack.append('(')  # not an array
         elif token.str_value == ')':  # could be close paren or close array
             if not stack:
-                raise SyntaxError("Unbalanced parentheses: TODO. Add tokens here")
+                raise SyntaxError("Too many close parentheses: TODO. Add tokens here")
             open_paren = stack.pop()
             if open_paren == '[':
                 # is close of the array.
                 tokens[i].str_value = ']'
         else:
             could_be_array = False
+    if stack:
+        raise SyntaxError("Not enough close parentheses. TODO. Add tokens here")
 
     return ''.join(t.str_value for t in tokens)
 
