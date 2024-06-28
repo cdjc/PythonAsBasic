@@ -183,13 +183,13 @@ class TranslationError(ValueError):
 
 
 def translate_print(tokens: list[Token]) -> str:
-    '''
+    """
     PRINT statement. Options:
     PRINT
     PRINT "FOO"
     PRINT "GUESS #";I,    (; joins with a space and supresses new line at the end)
     a trailing comma jumps to next TAB stop (every 10 chars on C64 I think: https://www.c64-wiki.com/wiki/PRINT ).
-    '''
+    """
     rval = 'PRINT('
     element_count = 0
     in_expression = False
@@ -216,7 +216,7 @@ def translate_print(tokens: list[Token]) -> str:
         else:
             if not in_expression:
                 in_expression = True
-                element_count += 1
+                element_count += 1  # TODO: What is this for? Some commented out code below
             rval += token.str_value
 
     if no_new_line:
@@ -224,15 +224,18 @@ def translate_print(tokens: list[Token]) -> str:
     # if element_count > 1:
     #     rval += ', sep=" "'
     rval += ')'
+    # If it's just a bare print, then we should remove the ()
+    if rval == 'PRINT()':
+        rval = 'PRINT'
     #print('#######', rval)
     return rval
 
 def translate_dim(tokens: list[Token]) -> str:
-    '''
+    """
     DIM A1(6),A(3),B(3)
     becomes
     DIM.A1(6), A(3), B(3)
-    '''
+    """
     assert tokens[0].str_value == "DIM"
     rval = 'DIM.'
     rval += ''.join([x.str_value for x in tokens[1:]])
@@ -242,12 +245,12 @@ def translate_dim(tokens: list[Token]) -> str:
     return rval
 
 def translate_input(tokens: list[Token]) -> str:
-    '''
+    """
     Examples:
     INPUT "WOULD YOU LIKE THE RULES (YES OR NO)";A$
     INPUT A$
     TODO: Variables can be separated by comma.
-    '''
+    """
     assert tokens[0].str_value == "INPUT"
     seen_str = False
     rval = 'INPUT'
@@ -264,17 +267,17 @@ def translate_input(tokens: list[Token]) -> str:
     return rval
 
 def translate_if(tokens: list[Token]) -> str:
-    '''
+    """
     Examples
     simple goto:
     IF(LEFT(AS, 1) == "N").THEN._150
     multi statement after THEN or nested (superstartrek.bas) TODO: do it
     IFS+E>10THENIFE>10ORD(7)=0THEN2060
-    '''
+    """
     assert tokens[0].str_value == "IF"
 
 def translate_assignment(tokens: list[Token]) -> str:
-    '''
+    """
     Examples
     A=5
     D=D+1
@@ -285,7 +288,7 @@ def translate_assignment(tokens: list[Token]) -> str:
     All functions are 3+ letters, so 1-2 letters then '(' is array
 
     Assumes parens are well balanced
-    '''
+    """
 
     # loop through the tokens and find all array parens and convert to '[' or ']'
     # The index of the array could be an expression and have parenthetical expressions (or other arrays)

@@ -4,3 +4,4 @@
 * GOSUB how will that work?
 * IF THEN statements can have multiple statements in the "THEN" block
 * boolean expressions are only valid in IF clause I think. So can tell when "=" should mean "=="
+* The conversion to tokenlist doesn't preserve whitespace

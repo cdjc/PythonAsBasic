@@ -20,6 +20,15 @@ class TestTranslate(unittest.TestCase):
         with self.assertRaises(SyntaxError):
             translate_assignment(tokenise("A=(5"))
 
+    def test_print(self):
+        self.assertEqual("PRINT", translate_print(tokenise("PRINT")))
+        self.assertEqual('PRINT("FOO")', translate_print(tokenise('PRINT "FOO"')))
+        self.assertEqual('PRINT("FOO", I._)', translate_print(tokenise('PRINT "FOO";I,')))
+        self.assertEqual('PRINT("FOO", (I+J))', translate_print(tokenise('PRINT "FOO";(I+J)')))
+
+    def test_dim(self):
+        self.assertEqual('DIM.A(3)', translate_dim(tokenise("DIM A(3)")))
+        self.assertEqual('DIM.A(3),B1(2+3)', translate_dim(tokenise("DIM A(3),B1(2+3)")))
 
 if __name__ == '__main__':
     unittest.main()
