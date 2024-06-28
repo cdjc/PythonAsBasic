@@ -21,10 +21,10 @@ IntFunction = Enum('IntFunction', [
     'INT',
     'RND',
     'LEN',
+    'ASC'
 ])
 
 StrFunction = Enum('StrFunction', [
-    'ASC',
     'LEFT',
     'MID',
 ])
@@ -104,16 +104,22 @@ def tokenise(line: str) -> list[Token]:
                 line = line[word_match.end():]
                 continue
         # 2-letter symbols (has to be done before single-letter symbols
-        if line[:2] in ('<>'):
+        if line[:2] in ('<>',):
             rval.append(Token(tok_type=Type.Symbol,
-                              str_value=line[:2],
+                              str_value='!=',  # translate <> to !=
                               num_value=None))
             line = line[2:]
             continue
         # single letter symbols
         if line[0] in "()+-*/=<>;,": #"('(',')','+','-','*','/','=',';',','):
+            str_value = line[0]
+            if str_value == '=':
+                pass
+                # TODO: I think boolean expressions are only in IF statements, so can deal with them there
+                # easier to just change = to == now.
+                # str_value = '=='  # we will translate back to "=" if it's for assignment
             rval.append(Token(tok_type=Type.Symbol,
-                              str_value=line[0],
+                              str_value=str_value,
                               num_value=None))
             line = line[1:]
             continue
@@ -146,8 +152,11 @@ def tokenise(line: str) -> list[Token]:
 
         var_match = re.match(r'[A-Z][A-Z0-9]?\$?', line)
         if var_match is not None:
+            variable = var_match.group()
+            if variable.endswith('$'):
+                variable = variable[:-1]+"str"
             rval.append(Token(tok_type=Type.Variable,
-                              str_value=var_match.group(),
+                              str_value=variable,
                               num_value=None))
             line = line[var_match.end():]
             continue
@@ -156,7 +165,6 @@ def tokenise(line: str) -> list[Token]:
         sys.exit(1)
 
     return rval
-
 
 
 def separate_token_lines(tokens):
@@ -168,6 +176,11 @@ def separate_token_lines(tokens):
         else:
             lines[-1].append(token)
     return lines
+
+
+class TranslationError(ValueError):
+    pass
+
 
 def translate_print(tokens: list[Token]) -> str:
     '''
@@ -220,12 +233,87 @@ def translate_dim(tokens: list[Token]) -> str:
     becomes
     DIM.A1(6), A(3), B(3)
     '''
+    assert tokens[0].str_value == "DIM"
     rval = 'DIM.'
     rval += ''.join([x.str_value for x in tokens[1:]])
     arrays_set.update([x.str_value for x in tokens[1:] if x.tok_type == Type.Variable])
     #print(arrays_set)
     #print(tokens)
     return rval
+
+def translate_input(tokens: list[Token]) -> str:
+    '''
+    Examples:
+    INPUT "WOULD YOU LIKE THE RULES (YES OR NO)";A$
+    INPUT A$
+    TODO: Variables can be separated by comma.
+    '''
+    assert tokens[0].str_value == "INPUT"
+    seen_str = False
+    rval = 'INPUT'
+    for i, token in enumerate(tokens[1:]):
+        if token.tok_type == Type.String and i == 0:
+            rval += ('("'+tokens[1].str_value+'")')
+            seen_str = True
+        elif token.tok_type == Type.Symbol and i == 1 and token.str_value == ';':
+            continue
+        elif token.tok_type == Type.Variable and i in (0,2):
+            rval += ('.'+token.str_value)
+        else:
+            raise TranslationError("Could not translate:"+str(tokens))
+    return rval
+
+def translate_if(tokens: list[Token]) -> str:
+    '''
+    Examples
+    simple goto:
+    IF(LEFT(AS, 1) == "N").THEN._150
+    multi statement after THEN or nested (superstartrek.bas) TODO: do it
+    IFS+E>10THENIFE>10ORD(7)=0THEN2060
+    '''
+    assert tokens[0].str_value == "IF"
+
+def translate_assignment(tokens: list[Token]) -> str:
+    '''
+    Examples
+    A=5
+    D=D+1
+    A(I)=INT(10*RND(1))
+    B(J)=A1(J)-48
+
+    we need to identify the arrays on the line, and convert to []
+    All functions are 3+ letters, so 1-2 letters then '(' is array
+
+    Assumes parens are well balanced
+    '''
+
+    # loop through the tokens and find all array parens and convert to '[' or ']'
+    # The index of the array could be an expression and have parenthetical expressions (or other arrays)
+    # Consider something like A(5+B(C+(2*3)-1)+Z(5)) = 0 # A B and Z are arrays.
+
+    stack = []
+    could_be_array = False
+    for i, token in enumerate(list(tokens)):
+        if token.tok_type == Type.Variable:
+            could_be_array = True
+        elif token.str_value == '(':
+            if could_be_array:
+                stack.append('[')
+                tokens[i].str_value = '['  # Change token list for array
+                could_be_array = False
+            else:
+                stack.append('(')  # not an array
+        elif token.str_value == ')':  # could be close paren or close array
+            if not stack:
+                raise SyntaxError("Unbalanced parentheses: TODO. Add tokens here")
+            open_paren = stack.pop()
+            if open_paren == '[':
+                # is close of the array.
+                tokens[i].str_value = ']'
+        else:
+            could_be_array = False
+
+    return ''.join(t.str_value for t in tokens)
 
 def translate_tokens(tokens: list[Token]) -> str:
     rval = ''
@@ -243,6 +331,12 @@ def translate_tokens(tokens: list[Token]) -> str:
         elif token.tok_type == Type.Keyword and token.str_value == Keyword.DIM.name:
             rval += translate_dim(tokens[i:])
             break
+        elif token.tok_type == Type.Keyword and token.str_value == Keyword.INPUT.name:
+            rval += translate_input(tokens[i:])
+            break
+        elif token.tok_type == Type.Variable: # assignment
+            rval += translate_assignment(tokens[i:])
+            break
         else:
             print(tokens)
             break
@@ -256,6 +350,8 @@ def translate_basic_line(raw_line: str) -> list[str]:
     for line in token_lines:
         #print(line)
         new_line = translate_tokens(line)
+        if not new_line.endswith('. '):
+            print(new_line)
 
 
 def read_basic(basic_lines: list[str]) -> list[str]:
