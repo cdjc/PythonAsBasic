@@ -273,8 +273,45 @@ def translate_if(tokens: list[Token]) -> str:
     IF(LEFT(AS, 1) == "N").THEN._150
     multi statement after THEN or nested (superstartrek.bas) TODO: do it
     IFS+E>10THENIFE>10ORD(7)=0THEN2060
+
+    To find the 'problem' THENs:
+    $ grep -o -e "THEN[^[:cntrl:]]*" *.bas | grep -v -e 'THEN \?[0-9]'
     """
     assert tokens[0].str_value == "IF"
+
+    # Everything between the IF and the THEN must be converted to IF(y...).THEN
+
+    rval = ''
+    seen_then = False
+    #print(tokens)
+    for token in tokens:
+        if seen_then:
+            if token.tok_type != Type.Integer:
+                # TODO For now, assume there's only a number after the THEN.
+                raise TranslationError("Non numerical THENs not yet implemented")
+            rval += '_'+token.str_value
+            return rval
+        if token.str_value == Keyword.IF.name:
+            rval += 'IF('
+            continue
+        if token.str_value == Keyword.THEN.name:
+            rval += ').THEN.'
+            seen_then = True
+            continue
+        # change equals comparisons: = -> ==. The <> to != conversion has already been done.
+        if token.tok_type == Type.Symbol:
+            if token.str_value == '=':
+                rval += '=='
+                continue
+        # add double quotes to a string
+        if token.tok_type == Type.String:
+            rval += '"'+token.str_value+'"'
+            continue
+        rval += token.str_value
+
+    # We didn't see the final number
+    raise SyntaxError("Missing number after THEN")
+
 
 def translate_assignment(tokens: list[Token]) -> str:
     """
@@ -322,29 +359,33 @@ def translate_assignment(tokens: list[Token]) -> str:
 
 def translate_tokens(tokens: list[Token]) -> str:
     rval = ''
-    for i, token in enumerate(tokens):
-        # line number
-        if i == 0 and tokens[0].tok_type == Type.Integer:
-            rval += '_'+tokens[0].str_value+". "
-            continue
-        elif token.tok_type == Type.Keyword and token.str_value == Keyword.PRINT.name:
+    i = 0
+    if tokens[0].tok_type == Type.Integer:  # line number
+        rval += '_'+tokens[0].str_value+". "
+        i = 1
+    token = tokens[i]
+    if token.tok_type == Type.Keyword:
+        if token.str_value == Keyword.PRINT.name:
             rval += translate_print(tokens[i:])
-            break
-        elif token.tok_type == Type.Comment:
-            rval += "REM # "+token.str_value
-            break
-        elif token.tok_type == Type.Keyword and token.str_value == Keyword.DIM.name:
+        elif token.str_value == Keyword.DIM.name:
             rval += translate_dim(tokens[i:])
-            break
-        elif token.tok_type == Type.Keyword and token.str_value == Keyword.INPUT.name:
+        elif token.str_value == Keyword.INPUT.name:
             rval += translate_input(tokens[i:])
-            break
-        elif token.tok_type == Type.Variable: # assignment
-            rval += translate_assignment(tokens[i:])
-            break
+        elif token.str_value == Keyword.IF.name:
+            rval += translate_if(tokens[i:])
         else:
             print(tokens)
-            break
+            return rval
+    elif token.tok_type == Type.Comment:
+        rval += "REM # "+token.str_value
+    elif token.tok_type == Type.Keyword and token.str_value == Keyword.DIM.name:
+        rval += translate_dim(tokens[i:])
+    elif token.tok_type == Type.Keyword and token.str_value == Keyword.INPUT.name:
+        rval += translate_input(tokens[i:])
+    elif token.tok_type == Type.Variable:  # assignment
+        rval += translate_assignment(tokens[i:])
+    else:
+        print(tokens)
     return rval
 
 
