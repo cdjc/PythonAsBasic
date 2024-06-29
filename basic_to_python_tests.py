@@ -42,5 +42,18 @@ class TestTranslate(unittest.TestCase):
         self.assertEqual('FOR.I=1,TO,3', translate_for(tokenise('FOR I=1 TO 3')))
         self.assertEqual('FOR.I=1+(3*Z),TO,3*Q', translate_for(tokenise('FOR I=1+(3*Z) TO 3*Q')))
 
+    def test_next(self):
+        self.assertEqual('NEXT', translate_next(tokenise('NEXT')))
+        self.assertEqual('NEXT.F', translate_next(tokenise('NEXT F')))
+        with self.assertRaises(SyntaxError):
+            translate_next(tokenise('NEXT F 2'))
+
+    def test_goto(self):
+        self.assertEqual('GOTO._200', translate_goto(tokenise('GOTO 200')))
+        with self.assertRaises(SyntaxError):
+            translate_goto(tokenise('GOTO'))
+        with self.assertRaises(SyntaxError):
+            translate_goto(tokenise('GOTO 200,400'))
+
 if __name__ == '__main__':
     unittest.main()

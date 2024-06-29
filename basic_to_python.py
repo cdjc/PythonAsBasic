@@ -367,6 +367,8 @@ def translate_for(tokens: list[Token]) -> str:
     TODO: Add STEP
     """
 
+    assert tokens[0].str_value == Keyword.FOR.name
+
     # Add . after FOR, add commas before and after TO
     rval = ''
     for token in tokens:
@@ -379,6 +381,34 @@ def translate_for(tokens: list[Token]) -> str:
         rval += token.str_value
     return rval
 
+def translate_next(tokens: list[Token]) -> str:
+    """
+    Could be a bare NEXT
+
+    Examples:
+    NEXT I
+    NEXT
+    """
+
+    assert tokens[0].str_value == Keyword.NEXT.name
+    if len(tokens) == 1:
+        return 'NEXT'
+    elif len(tokens) == 2:
+        return 'NEXT.'+tokens[1].str_value
+    raise SyntaxError('Too many tokens after NEXT')
+
+def translate_goto(tokens: list[Token]) -> str:
+    """
+    Standard GOTO.
+
+    TODO: Does not support computed gotos: ("ON X GOTO 200,300,400")
+    See computed gotos with $ grep -e 'ON[^\"]*GOTO' *.bas
+    21/106 programs have computed goto.
+    """
+    assert tokens[0].str_value == Keyword.GOTO.name
+    if len(tokens) != 2:
+        raise SyntaxError('Malformed GOTO')
+    return 'GOTO._'+tokens[1].str_value
 
 def translate_tokens(tokens: list[Token]) -> str:
     rval = ''
@@ -398,19 +428,20 @@ def translate_tokens(tokens: list[Token]) -> str:
             rval += translate_if(tokens[i:])
         elif token.str_value == Keyword.FOR.name:
             rval += translate_for(tokens[i:])
+        elif token.str_value == Keyword.NEXT.name:
+            rval += translate_next(tokens[i:])
+        elif token.str_value == Keyword.GOTO.name:
+            rval += translate_goto(tokens[i:])
+        elif token.str_value == Keyword.END.name:
+            rval += 'END'
         else:
-            print(tokens)
-            return rval
+            raise TranslationError('Unknown keyword: '+token.str_value)
     elif token.tok_type == Type.Comment:
         rval += "REM # "+token.str_value
-    elif token.tok_type == Type.Keyword and token.str_value == Keyword.DIM.name:
-        rval += translate_dim(tokens[i:])
-    elif token.tok_type == Type.Keyword and token.str_value == Keyword.INPUT.name:
-        rval += translate_input(tokens[i:])
     elif token.tok_type == Type.Variable:  # assignment
         rval += translate_assignment(tokens[i:])
     else:
-        print(tokens)
+        raise TranslationError('Unrecognised token: ' + token.str_value)
     return rval
 
 
