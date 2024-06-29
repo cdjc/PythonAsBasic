@@ -416,6 +416,8 @@ def translate_tokens(tokens: list[Token]) -> str:
     if tokens[0].tok_type == Type.Integer:  # line number
         rval += '_'+tokens[0].str_value+". "
         i = 1
+        if len(tokens) == 1:
+            raise SyntaxError('Line number with no line')
     token = tokens[i]
     if token.tok_type == Type.Keyword:
         if token.str_value == Keyword.PRINT.name:
@@ -435,13 +437,16 @@ def translate_tokens(tokens: list[Token]) -> str:
         elif token.str_value == Keyword.END.name:
             rval += 'END'
         else:
-            raise TranslationError('Unknown keyword: '+token.str_value)
+            raise SyntaxError('Unknown keyword: '+token.str_value)
     elif token.tok_type == Type.Comment:
-        rval += "REM # "+token.str_value
+        if token.str_value:
+            rval += "REM #"+token.str_value
+        else:
+            rval += 'REM'
     elif token.tok_type == Type.Variable:  # assignment
         rval += translate_assignment(tokens[i:])
     else:
-        raise TranslationError('Unrecognised token: ' + token.str_value)
+        raise SyntaxError('Unrecognised token: ' + token.str_value)
     return rval
 
 
