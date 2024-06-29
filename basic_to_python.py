@@ -190,9 +190,8 @@ def translate_print(tokens: list[Token]) -> str:
     PRINT "GUESS #";I,    (; joins with a space and supresses new line at the end)
     a trailing comma jumps to next TAB stop (every 10 chars on C64 I think: https://www.c64-wiki.com/wiki/PRINT ).
     """
+    print(tokens)
     rval = 'PRINT('
-    element_count = 0
-    in_expression = False
     no_new_line = tokens[-1].tok_type == Type.Symbol and tokens[-1].str_value in ',;'
     if no_new_line:
         tokens = tokens[:-1]  # strip the trailing comma
@@ -201,28 +200,16 @@ def translate_print(tokens: list[Token]) -> str:
             assert token.tok_type == Type.Keyword and token.str_value == Keyword.PRINT.name
             continue
         elif token.tok_type == Type.String:
-            # if element_count > 0:
-            #     rval += " + "
             rval += '"'+token.str_value+'"'
-            in_expression = False
-            element_count += 1
             continue
         elif token.tok_type == Type.Symbol and token.str_value == ';':
-            if in_expression:
-                rval += ')'
-                in_expression = False
-            rval += ", "
+            rval += ","
             continue
         else:
-            if not in_expression:
-                in_expression = True
-                element_count += 1  # TODO: What is this for? Some commented out code below
             rval += token.str_value
 
     if no_new_line:
         rval += '._'
-    # if element_count > 1:
-    #     rval += ', sep=" "'
     rval += ')'
     # If it's just a bare print, then we should remove the ()
     if rval == 'PRINT()':
@@ -451,25 +438,55 @@ def translate_tokens(tokens: list[Token]) -> str:
 
 
 def translate_basic_line(raw_line: str) -> list[str]:
+    lines = []
     tokens = tokenise(raw_line)
 
     token_lines = separate_token_lines(tokens)
     for line in token_lines:
         #print(line)
-        new_line = translate_tokens(line)
-        if not new_line.endswith('. '):
-            print(new_line)
-
+        lines.append(translate_tokens(line))
+    return lines
 
 def read_basic(basic_lines: list[str]) -> list[str]:
     rval = []
     for line in basic_lines:
-        translate_basic_line(line)
-    return []
+        rval.extend(translate_basic_line(line))
+    return rval
 
+def translate_file(fname: str) -> None:
+    """
+    Read a .bas file and produce a corresponding PythonAsBasic .bas.py file
+    """
 
+    header = '''
+from basic import basic
+from basic_functions import *
+
+@basic
+def {name}():
+    '''
+
+    footer = '''
+
+if __name__ == '__main__':
+    {name}()
+    '''
+
+    lines = read_basic(open(fname).readlines())
+    # I'm happy with foo.bas.py as a filename
+    # It's less likely to be confused with a real python file.
+    pyname = fname+'.py'
+    func_name = fname.split('.')[0]
+    with open(pyname,'w') as fid:
+        print(header.format(name=func_name), file=fid)
+        for line in lines:
+            print('    '+line, file=fid)
+        print(footer.format(name=func_name), file=fid)
 
 if __name__ == '__main__':
     #tokenise('5 PRINT TAB(33);"BAGELS"')
-    read_basic(open("bagels.bas").readlines())
-    print("Hello")
+    #lines = read_basic(open("bagels.bas").readlines())
+    #for line in lines:
+    #    print(line)
+    #print("Hello")
+    translate_file('bagels.bas')

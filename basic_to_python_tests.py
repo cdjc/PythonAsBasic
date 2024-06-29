@@ -23,8 +23,9 @@ class TestTranslate(unittest.TestCase):
     def test_print(self):
         self.assertEqual("PRINT", translate_tokens(tokenise("PRINT")))
         self.assertEqual('PRINT("FOO")', translate_tokens(tokenise('PRINT "FOO"')))
-        self.assertEqual('PRINT("FOO", I._)', translate_tokens(tokenise('PRINT "FOO";I,')))
-        self.assertEqual('PRINT("FOO", (I+J))', translate_tokens(tokenise('PRINT "FOO";(I+J)')))
+        self.assertEqual('PRINT("FOO",I._)', translate_tokens(tokenise('PRINT "FOO";I,')))
+        self.assertEqual('PRINT("FOO",(I+J))', translate_tokens(tokenise('PRINT "FOO";(I+J)')))
+        self.assertEqual('PRINT(TAB(33),"BAGELS")', translate_tokens(tokenise('PRINT TAB(33);"BAGELS"')))
 
     def test_dim(self):
         self.assertEqual('DIM.A(3)', translate_tokens(tokenise("DIM A(3)")))
