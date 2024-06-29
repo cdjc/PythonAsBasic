@@ -357,6 +357,29 @@ def translate_assignment(tokens: list[Token]) -> str:
 
     return ''.join(t.str_value for t in tokens)
 
+def translate_for(tokens: list[Token]) -> str:
+    """
+    Examples:
+
+    FOR I=1 TO 3
+    FOR J=1 TO I-1
+
+    TODO: Add STEP
+    """
+
+    # Add . after FOR, add commas before and after TO
+    rval = ''
+    for token in tokens:
+        if token.tok_type == Type.Keyword and token.str_value == Keyword.FOR.name:
+            rval += 'FOR.'
+            continue
+        if token.tok_type == Type.Keyword and token.str_value == Keyword.TO.name:
+            rval += ',TO,'
+            continue
+        rval += token.str_value
+    return rval
+
+
 def translate_tokens(tokens: list[Token]) -> str:
     rval = ''
     i = 0
@@ -373,6 +396,8 @@ def translate_tokens(tokens: list[Token]) -> str:
             rval += translate_input(tokens[i:])
         elif token.str_value == Keyword.IF.name:
             rval += translate_if(tokens[i:])
+        elif token.str_value == Keyword.FOR.name:
+            rval += translate_for(tokens[i:])
         else:
             print(tokens)
             return rval

@@ -38,5 +38,9 @@ class TestTranslate(unittest.TestCase):
         with self.assertRaises(SyntaxError):
             translate_if(tokenise('IF B(1)=B(2) THEN'))
 
+    def test_for(self):
+        self.assertEqual('FOR.I=1,TO,3', translate_for(tokenise('FOR I=1 TO 3')))
+        self.assertEqual('FOR.I=1+(3*Z),TO,3*Q', translate_for(tokenise('FOR I=1+(3*Z) TO 3*Q')))
+
 if __name__ == '__main__':
     unittest.main()
