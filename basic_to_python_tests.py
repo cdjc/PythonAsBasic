@@ -35,7 +35,7 @@ class TestTranslate(unittest.TestCase):
         self.assertEqual('IF(LEFT(Astr,1)=="N").THEN._150', translate_tokens(tokenise('IF LEFT$(A$,1)="N" THEN 150')))
         self.assertEqual('IF(I-1==0).THEN._200', translate_tokens(tokenise('IF I-1=0 THEN 200')))
         self.assertEqual('IF(LEN(Astr)!=3).THEN._630', translate_tokens(tokenise('IF LEN(A$)<>3 THEN 630')))
-        self.assertEqual('IF(B(1)==B(2)).THEN._650', translate_tokens(tokenise('IF B(1)=B(2) THEN 650')))
+        self.assertEqual('IF(B[1]==B[2]).THEN._650', translate_tokens(tokenise('IF B(1)=B(2) THEN 650')))
         with self.assertRaises(SyntaxError):
             translate_tokens(tokenise('IF B(1)=B(2) THEN'))
 
