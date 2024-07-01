@@ -42,12 +42,14 @@ re_print_fn = re.compile(r"PRINT\((.*)\)")
 # TODO: Fix this for multidimensional arrays
 re_dim = re.compile(r'DIM\.[A-Z][0-9A-Z]*\([0-9]+\)(, [A-Z][0-9A-Z]*\([0-9]+\))*')
 re_assign = re.compile(r'(?P<LHSVar>[A-Z][0-9A-Z]*)(?P<array>\[.*\])?\s*=\s*(?P<expr>.*)')
-re_input_var = re.compile(r"INPUT(\('(.*)'\))?\.([A-Z][0-9A-Z]*)")
+re_input_var = re.compile(r"INPUT(\('(.*)'\))?\.([A-Z][0-9A-Za-z]*)")
 re_if_stmt = re.compile(r"IF\((?P<expr>.*)\)\.THEN\.(?P<stmt>.*)")
 # TODO Add step to FOR
 re_for_stmt = re.compile(r"FOR\.(?P<var>[A-Z][A-Z0-9]*)\s*=\s*\((?P<expr_from>.*),\s*TO,\s*(?P<expr_to>.*)\)")
 re_next_stmt = re.compile(r'NEXT\.[A-Z][A-Z0-9]*')
 re_goto_stmt = re.compile(r'GOTO\._[1-9][0-9]*')
+re_rem_stmt = re.compile(r'REM\.*')
+re_end_stmt = re.compile(r'END')
 
 # expression rewriting
 re_left_fn = re.compile(r'LEFT\(\s*(?P<var>[A-Z][A-Z0-9]*)\s*,\s*(?P<len>\d+\s*)\)')
@@ -118,7 +120,7 @@ def rewrite_statement(node: ast.AST):
         lhsarray = match['array']
         lhs = lhsvar
         if lhsarray is not None:
-            # TODO: lhsarray could me multidimensional and are expressions.
+            # TODO: lhsarray could be multidimensional and are expressions.
             lhs = lhs + lhsarray
         new_line = lhs + ' = '+rhs
     elif match := re_input_var.fullmatch(line):
@@ -187,6 +189,10 @@ def rewrite_statement(node: ast.AST):
         new_line = '\n'.join((line_incr, line_goto, line_end))
     elif match := re_goto_stmt.fullmatch(line):
         new_line = line.replace('GOTO', 'goto')
+    elif match := re_rem_stmt.fullmatch(line):
+        new_line = line.replace('REM', 'pass #')
+    elif match := re_end_stmt.fullmatch(line):
+        new_line = line.replace('END', 'return')
     else:
         raise Exception("Don't know this line: "+line)
 
@@ -233,7 +239,7 @@ def process_statements(root: ast.Module):
         nodes.extend(rewrite_statement(statement))
         #nodes.extend(process_basic_statement(statement))
     fn.body = nodes
-    # print(ast.unparse(fn))
+    print(ast.unparse(fn))
 
 
 def basic(fn: Callable) -> Callable:
