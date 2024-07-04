@@ -56,8 +56,9 @@ class TestTranslate(unittest.TestCase):
         with self.assertRaises(SyntaxError):
             translate_tokens(tokenise('GOTO 200,400'))
 
-    def test_end(self):
+    def test_end_and_stop(self):
         self.assertEqual('END', translate_tokens(tokenise('END')))
+        self.assertEqual('STOP', translate_tokens(tokenise('STOP')))
 
     def test_bad_token(self):
         with self.assertRaises(SyntaxError):

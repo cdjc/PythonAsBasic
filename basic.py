@@ -50,6 +50,7 @@ re_next_stmt = re.compile(r'NEXT\.[A-Z][A-Z0-9]*')
 re_goto_stmt = re.compile(r'GOTO\._[1-9][0-9]*')
 re_rem_stmt = re.compile(r'REM\.*')
 re_end_stmt = re.compile(r'END')
+re_stop_stmt = re.compile(r'STOP')
 
 # expression rewriting
 re_left_fn = re.compile(r'LEFT\(\s*(?P<var>[A-Z][A-Z0-9]*)\s*,\s*(?P<len>\d+\s*)\)')
@@ -124,10 +125,15 @@ def rewrite_statement(node: ast.AST):
             lhs = lhs + lhsarray
         new_line = lhs + ' = '+rhs
     elif match := re_input_var.fullmatch(line):
+        # could be string or integer depending on variable. string is A$ which is Astr
+        input_str = 'input()'
+        if not match[3].endswith('str'):
+            input_str = 'int(input())'
+
         if match[2]:
-            new_line = f"print('{match[2]}', end=' ');{match[3]} = input()"
+            new_line = f"print('{match[2]}', end=' ');{match[3]} = {input_str}"
         else:
-            new_line = f'{match[3]} = input()'
+            new_line = f'{match[3]} = {input_str}'
         new_line += '\nprint()'  # implied newline after INPUT
     elif match := re_if_stmt.fullmatch(line):
         exp = match.group('expr')
@@ -193,8 +199,15 @@ def rewrite_statement(node: ast.AST):
         new_line = line.replace('REM', 'pass #')
     elif match := re_end_stmt.fullmatch(line):
         new_line = line.replace('END', 'return')
+    elif match := re_stop_stmt.fullmatch(line):
+        new_line = line.replace('STOP', 'return')
     else:
-        raise Exception("Don't know this line: "+line)
+        #raise Exception("Don't know this line: "+line)
+
+        # pass through Python lines
+        # If we raise an exception instead, we can catch translation errors
+        # At "compile" time instead of run time.
+        new_line = line
 
     if line_no_str:
         new_line = 'label .'+line_no_str+'\n'+new_line

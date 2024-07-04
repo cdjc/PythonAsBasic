@@ -41,6 +41,7 @@ class Keyword(Enum):
     INPUT = auto()
     GOTO = auto()
     END = auto()
+    STOP = auto()
 
 
 int_function_dict = {x.name:x.value for x in IntFunction}
@@ -113,15 +114,13 @@ def tokenise(line: str) -> list[Token]:
         # single letter symbols
         if line[0] in "()+-*/=<>;,": #"('(',')','+','-','*','/','=',';',','):
             str_value = line[0]
-            if str_value == '=':
-                pass
-                # TODO: I think boolean expressions are only in IF statements, so can deal with them there
-                # easier to just change = to == now.
-                # str_value = '=='  # we will translate back to "=" if it's for assignment
+            # could be double symbol: "<=" or ">="
+            if line[:2] in ('<=', '<='):
+                str_value = line[:2]
             rval.append(Token(tok_type=Type.Symbol,
                               str_value=str_value,
                               num_value=None))
-            line = line[1:]
+            line = line[len(str_value):]  # chop off however much we took for the token.
             continue
 
         str_match = re.match(r'"[^"]*"', line)
@@ -188,6 +187,7 @@ def translate_print(tokens: list[Token]) -> str:
     PRINT
     PRINT "FOO"
     PRINT "GUESS #";I,    (; joins with a space and supresses new line at the end)
+    PRINT "FOO" N         ( space joins chars e.g. 23matches.bas line 270)
     a trailing comma jumps to next TAB stop (every 10 chars on C64 I think: https://www.c64-wiki.com/wiki/PRINT ).
     """
     #print(tokens)
@@ -195,17 +195,27 @@ def translate_print(tokens: list[Token]) -> str:
     no_new_line = tokens[-1].tok_type == Type.Symbol and tokens[-1].str_value in ',;'
     if no_new_line:
         tokens = tokens[:-1]  # strip the trailing comma
+    prev_is_string = False
     for i, token in enumerate(tokens):
         if i == 0:
             assert token.tok_type == Type.Keyword and token.str_value == Keyword.PRINT.name
             continue
         elif token.tok_type == Type.String:
+            # if the previous token is not PRINT or ; then it might be a space and we insert ,
+            prev_token = tokens[i-1]
+            if not (prev_token.str_value == Keyword.PRINT.name or prev_token.str_value == ';'):
+                rval += ','
             rval += '"'+token.str_value+'"'
+            prev_is_string = True
             continue
         elif token.tok_type == Type.Symbol and token.str_value == ';':
             rval += ","
+            prev_is_string = False
             continue
         else:
+            if prev_is_string:
+                # Could be space instead of ; like 23matches.bas line 270
+                rval += ','
             rval += token.str_value
 
     if no_new_line:
@@ -428,8 +438,8 @@ def translate_tokens(tokens: list[Token]) -> str:
             rval += translate_next(tokens[i:])
         elif token.str_value == Keyword.GOTO.name:
             rval += translate_goto(tokens[i:])
-        elif token.str_value == Keyword.END.name:
-            rval += 'END'
+        elif token.str_value == Keyword.END.name or token.str_value == Keyword.STOP.name:
+            rval += token.str_value
         else:
             raise SyntaxError('Unknown keyword: '+token.str_value)
     elif token.tok_type == Type.Comment:
@@ -484,6 +494,7 @@ if __name__ == '__main__':
     # It's less likely to be confused with a real python file.
     pyname = fname+'.py'
     func_name = fname.split('.')[0]
+    func_name = 'basic_'+func_name  # some files start with a digit
     with open(pyname,'w') as fid:
         print(header.format(name=func_name), file=fid)
         for line in lines:
@@ -496,4 +507,4 @@ if __name__ == '__main__':
     #for line in lines:
     #    print(line)
     #print("Hello")
-    translate_file('bagels.bas')
+    translate_file('23matches.bas')
