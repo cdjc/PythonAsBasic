@@ -53,7 +53,7 @@ re_end_stmt = re.compile(r'END')
 re_stop_stmt = re.compile(r'STOP')
 
 # expression rewriting
-re_left_fn = re.compile(r'LEFT\(\s*(?P<var>[A-Z][A-Z0-9]*)\s*,\s*(?P<len>\d+\s*)\)')
+#re_left_fn = re.compile(r'LEFT\(\s*(?P<var>[A-Z][A-Z0-9]*)\s*,\s*(?P<len>\d+\s*)\)')
 re_rand_fn = re.compile(r'RND\([0-9]*\)')
 re_mid_fn = re.compile(r'MID\((?P<expr_str>.*),(?P<expr_start>.*), (?P<expr_end>.*)\)')
 
@@ -213,16 +213,29 @@ def rewrite_statement(node: ast.AST):
         new_line = 'label .'+line_no_str+'\n'+new_line
     # print('NL',new_line)
 
-    new_line = f'line="""{str(raw_line)}"""\n{new_line}'
+    new_line = f'''_line="""{str(raw_line)}"""\npy_lineno={node.lineno}\n{new_line}'''
+
     new_module = ast.parse(new_line, __name__, mode='exec')
     new_nodes = new_module.body
     for new_node in new_nodes:
-        ast.copy_location(new_node, node)
-        ast.fix_missing_locations(new_node)
+        fix_line_nos(new_node, node)
     return new_nodes
 
+def fix_line_nos(to_node: ast.AST, from_node: ast.AST):
+    """
+    Recursively inherit line numbers and column offsets from from_node
+
+    Note: this is not the same as ast.fix_missing_locations or ast.copy_location
+    """
+    to_node.lineno = from_node.lineno
+    to_node.end_lineno = from_node.end_lineno
+    to_node.col_offset = from_node.col_offset
+    to_node.end_col_offset = from_node.end_col_offset
+    for child_node in ast.iter_child_nodes(to_node):
+        fix_line_nos(child_node, to_node)
 
 def make_header_ast(fn_ast: ast.FunctionDef):
+    # TODO: remove header and use basic_functions.py
     header = '''
 import random
 
@@ -231,9 +244,6 @@ def MID(a, b, c):
 '''
     new_module = ast.parse(header, __name__, mode='exec')
     new_nodes = new_module.body
-    for new_node in new_nodes:
-        ast.copy_location(new_node, fn_ast)
-        ast.fix_missing_locations(new_node)
     return new_nodes
 
 
@@ -256,16 +266,19 @@ def process_statements(root: ast.Module):
 
 
 def basic(fn: Callable) -> Callable:
-    source = inspect.getsource(fn)
-    # peel off this decorator from the code.
-    fn_source = source[source.find('\n') + 1:]
+    # source = inspect.getsource(fn)
+    sourcelines, lnum = inspect.getsourcelines(fn)
+    # peel off this decorator (the first line) from the code.
+    # fn_source = source[source.find('\n') + 1:]
+    fn_source = ''.join(sourcelines[1:])
 
     indent = fn_source.find('def')
     fn_source = '\n'.join(x[indent:] for x in fn_source.split('\n'))
 
-    # print('-'*8)
-    # print(fn_source)
+    #print('-'*8)
+    #print(fn_source)
     root = ast.parse(fn_source)
+    ast.increment_lineno(root, lnum)
 
     process_statements(root)
 
@@ -302,5 +315,9 @@ if __name__ == '__main__':
         _30. NEXT.I
         _45. A="ABC"
         _50. PRINT(LEFT("ABC", 2))
+        _55. A=5
+        print(A,A,A)
+        #_56. PRINT(D)
+        _60. END
 
     prnt()
