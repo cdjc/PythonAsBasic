@@ -1,7 +1,6 @@
 import ast
 import inspect
 import io
-import random
 import re
 import sys
 import types
@@ -61,15 +60,8 @@ re_mid_fn = re.compile(r'MID\((?P<expr_str>.*),(?P<expr_start>.*), (?P<expr_end>
 
 for_stack = []
 for_counter = 0
-def rewrite_expression(line: str):
-    #line = re_left_fn.sub(lambda m: f'{m.group("var")}[:{m.group("len")}]', line)  # LEFT(A, 2) -> A[:2]
-    line = line.replace('INT(', 'int(')
-    line = line.replace('LEN(', 'len(')
-    line = line.replace('ASC(', 'ord(')
-    line = re_rand_fn.sub('random.random()', line)
-    #if match := re_mid_fn
-    # print('expr',line)
-    return line
+
+
 def rewrite_statement(node: ast.AST):
     global for_counter
 
@@ -102,7 +94,6 @@ def rewrite_statement(node: ast.AST):
             end = "' '"
         else:
             end = r"'\n'"
-        exp = rewrite_expression(exp)
         new_line = f"print({exp}, end={end})"
     elif match := re_dim.fullmatch(line):
         # strip off the leading DIM.
@@ -116,7 +107,7 @@ def rewrite_statement(node: ast.AST):
         dim_str = ','.join(f'[0]*(({x})+1)' for x in dim_list)
         new_line = var_str + '=' + dim_str
     elif match := re_assign.fullmatch(line):
-        rhs = rewrite_expression(match['expr'])
+        rhs = match['expr']
         lhsvar = match['LHSVar']
         lhsarray = match['array']
         lhs = lhsvar
@@ -138,7 +129,6 @@ def rewrite_statement(node: ast.AST):
     elif match := re_if_stmt.fullmatch(line):
         exp = match.group('expr')
         stmt = match.group('stmt')
-        exp = rewrite_expression(exp)
         if line_no := re_line_no.fullmatch(stmt):
             stmt = f'goto.{line_no[0]}'
         new_line = f'if {exp}:\n    {stmt}'
@@ -170,8 +160,8 @@ def rewrite_statement(node: ast.AST):
         var = match['var']
         start_expr_raw = match['expr_from']
         end_expr_raw = match['expr_to']
-        start_expr = rewrite_expression(start_expr_raw)
-        end_expr = rewrite_expression(end_expr_raw)
+        start_expr = start_expr_raw
+        end_expr = end_expr_raw
         step_expr = '1'  # TODO: add step expr in regular expression
         line_assign = f'{var} = {start_expr}'
         line_step_assign = f'{for_step_var} = {step_expr}'
@@ -234,19 +224,6 @@ def fix_line_nos(to_node: ast.AST, from_node: ast.AST):
     for child_node in ast.iter_child_nodes(to_node):
         fix_line_nos(child_node, to_node)
 
-def make_header_ast(fn_ast: ast.FunctionDef):
-    # TODO: remove header and use basic_functions.py
-    header = '''
-import random
-
-def MID(a, b, c):
-    return a[b-1:b-1+c]
-'''
-    new_module = ast.parse(header, __name__, mode='exec')
-    new_nodes = new_module.body
-    return new_nodes
-
-
 def process_statements(root: ast.Module):
     '''
     Process each statement for transformation
@@ -256,7 +233,7 @@ def process_statements(root: ast.Module):
     checkModule(root)
     fn = root.body[0]
     checkFunctionDef(fn)
-    nodes = make_header_ast(fn)
+    nodes = [] #= make_header_ast(fn)
     for statement in fn.body:
         #print('!',ast.unparse(statement))
         nodes.extend(rewrite_statement(statement))
@@ -306,6 +283,7 @@ class auto_input:
 
 if __name__ == '__main__':
 
+    from basic_functions import *
     @basic
     def prnt():
         _10. FOR.I=1,TO,2

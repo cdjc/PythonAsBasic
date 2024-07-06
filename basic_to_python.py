@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from enum import Enum, auto
 import re
 
+
 class Type(Enum):
     String = auto()
     Integer = auto()
@@ -16,39 +17,64 @@ class Type(Enum):
     Comment = auto()
 
 
-IntFunction = Enum('IntFunction', [
-    'TAB',
-    'INT',
-    'RND',
-    'LEN',
-    'ASC'
-])
+class IntFunction(Enum):
+    ABS = auto()
+    ASC = auto()
+    ATN = auto()
+    COS = auto()
+    EXP = auto()
+    INT = auto()
+    LEN = auto()
+    LOG = auto()
+    RND = auto()
+    SGN = auto()
+    SIN = auto()
+    SQR = auto()
+    TAB = auto()
+    TAN = auto()
+    VAL = auto()
 
-StrFunction = Enum('StrFunction', [
-    'LEFT',
-    'MID',
-])
+
+class StrFunction(Enum):
+    CHR = auto()
+    LEFT = auto()
+    MID = auto()
+    RIGHT = auto()
+    SPC = auto()  # not used
+    STR = auto()
+
 
 class Keyword(Enum):
-    PRINT = auto()
-    IF = auto()
-    THEN = auto()
-    FOR = auto()
-    TO = auto()
-    STEP = auto()
-    NEXT = auto()
+    DATA = auto()
+    DEF = auto()  # for DEF FN. Not yet implemented
     DIM = auto()
-    INPUT = auto()
-    GOTO = auto()
     END = auto()
+    FOR = auto()  # see also TO and STEP
+    GOSUB = auto()
+    GOTO = auto()
+    IF = auto()  # see also THEN
+    INPUT = auto()
+    LET = auto()
+    NEXT = auto()
+    ON = auto()  # used with GOTO or GOSUB
+    PRINT = auto()
+    RANDOMIZE = auto()  # not used in example programs
+    READ = auto()
+#    REM = auto()   We treat REM as a Comment, not a keyword
+    RESTORE = auto()
+    RETURN = auto()
+    THEN = auto()
+    TO = auto()  # see also FOR
     STOP = auto()
+    STEP = auto()  # see also FOR
 
 
-int_function_dict = {x.name:x.value for x in IntFunction}
-str_function_dict = {x.name:x.value for x in StrFunction}
-keyword_dict = {x.name:x.value for x in Keyword}
+int_function_names = set(x.name for x in IntFunction)
+str_function_names = set(x.name for x in StrFunction)
+keyword_names = set(x.name for x in Keyword)
 
 arrays_set = set()  # set for remembering arrays. TODO: Only 1 dimension allowed for now
+
 
 @dataclass
 class Token:
@@ -64,7 +90,7 @@ def tokenise(line: str) -> list[Token]:
     # Keep chopping bits off the front of the line that we recognise until gone
     rval = []
     while line:
-        #print(rval)
+        # print(rval)
         ws = re.match(r'\s+', line)
         if ws is not None:
             line = line[ws.end():]
@@ -85,20 +111,23 @@ def tokenise(line: str) -> list[Token]:
             # string variables/functions end with a $
 
             # first check functions
-            if word in int_function_dict:
+            if word in int_function_names:
                 rval.append(Token(tok_type=Type.Function,
                                   str_value=word,
                                   num_value=None))
                 line = line[word_match.end():]
                 continue
-            elif word in str_function_dict:
+            elif word in str_function_names:
                 rval.append(Token(tok_type=Type.Function,
                                   str_value=word,
                                   num_value=None))
                 # Add 1 for the $ at the end of these functions
+                if line[word_match.end()] != '$':
+                    raise SyntaxError(f'Expected a $ after the string function {word}')
                 line = line[word_match.end() + 1:]
+
                 continue
-            elif word in keyword_dict:
+            elif word in keyword_names:
                 rval.append(Token(tok_type=Type.Keyword,
                                   str_value=word,
                                   num_value=None))
@@ -112,7 +141,7 @@ def tokenise(line: str) -> list[Token]:
             line = line[2:]
             continue
         # single letter symbols
-        if line[0] in "()+-*/=<>;,": #"('(',')','+','-','*','/','=',';',','):
+        if line[0] in "()+-*/=<>;,":  # "('(',')','+','-','*','/','=',';',','):
             str_value = line[0]
             # could be double symbol: "<=" or ">="
             if line[:2] in ('<=', '<='):
@@ -153,7 +182,7 @@ def tokenise(line: str) -> list[Token]:
         if var_match is not None:
             variable = var_match.group()
             if variable.endswith('$'):
-                variable = variable[:-1]+"str"
+                variable = variable[:-1] + "str"
             rval.append(Token(tok_type=Type.Variable,
                               str_value=variable,
                               num_value=None))
@@ -190,7 +219,7 @@ def translate_print(tokens: list[Token]) -> str:
     PRINT "FOO" N         ( space joins chars e.g. 23matches.bas line 270)
     a trailing comma jumps to next TAB stop (every 10 chars on C64 I think: https://www.c64-wiki.com/wiki/PRINT ).
     """
-    #print(tokens)
+    # print(tokens)
     rval = 'PRINT('
     no_new_line = tokens[-1].tok_type == Type.Symbol and tokens[-1].str_value in ',;'
     if no_new_line:
@@ -202,10 +231,10 @@ def translate_print(tokens: list[Token]) -> str:
             continue
         elif token.tok_type == Type.String:
             # if the previous token is not PRINT or ; then it might be a space and we insert ,
-            prev_token = tokens[i-1]
+            prev_token = tokens[i - 1]
             if not (prev_token.str_value == Keyword.PRINT.name or prev_token.str_value == ';'):
                 rval += ','
-            rval += '"'+token.str_value+'"'
+            rval += '"' + token.str_value + '"'
             prev_is_string = True
             continue
         elif token.tok_type == Type.Symbol and token.str_value == ';':
@@ -224,8 +253,9 @@ def translate_print(tokens: list[Token]) -> str:
     # If it's just a bare print, then we should remove the ()
     if rval == 'PRINT()':
         rval = 'PRINT'
-    #print('#######', rval)
+    # print('#######', rval)
     return rval
+
 
 def translate_dim(tokens: list[Token]) -> str:
     """
@@ -237,9 +267,10 @@ def translate_dim(tokens: list[Token]) -> str:
     rval = 'DIM.'
     rval += ''.join([x.str_value for x in tokens[1:]])
     arrays_set.update([x.str_value for x in tokens[1:] if x.tok_type == Type.Variable])
-    #print(arrays_set)
-    #print(tokens)
+    # print(arrays_set)
+    # print(tokens)
     return rval
+
 
 def translate_input(tokens: list[Token]) -> str:
     """
@@ -253,15 +284,16 @@ def translate_input(tokens: list[Token]) -> str:
     rval = 'INPUT'
     for i, token in enumerate(tokens[1:]):
         if token.tok_type == Type.String and i == 0:
-            rval += ('("'+tokens[1].str_value+'")')
+            rval += ('("' + tokens[1].str_value + '")')
             seen_str = True
         elif token.tok_type == Type.Symbol and i == 1 and token.str_value == ';':
             continue
-        elif token.tok_type == Type.Variable and i in (0,2):
-            rval += ('.'+token.str_value)
+        elif token.tok_type == Type.Variable and i in (0, 2):
+            rval += ('.' + token.str_value)
         else:
-            raise TranslationError("Could not translate:"+str(tokens))
+            raise TranslationError("Could not translate:" + str(tokens))
     return rval
+
 
 def translate_if(tokens: list[Token]) -> str:
     """
@@ -282,13 +314,13 @@ def translate_if(tokens: list[Token]) -> str:
 
     rval = ''
     seen_then = False
-    #print(tokens)
+    # print(tokens)
     for token in tokens:
         if seen_then:
             if token.tok_type != Type.Integer:
                 # TODO For now, assume there's only a number after the THEN.
                 raise TranslationError("Non numerical THENs not yet implemented")
-            rval += '_'+token.str_value
+            rval += '_' + token.str_value
             return rval
         if token.str_value == Keyword.IF.name:
             rval += 'IF('
@@ -304,12 +336,13 @@ def translate_if(tokens: list[Token]) -> str:
                 continue
         # add double quotes to a string
         if token.tok_type == Type.String:
-            rval += '"'+token.str_value+'"'
+            rval += '"' + token.str_value + '"'
             continue
         rval += token.str_value
 
     # We didn't see the final number
     raise SyntaxError("Missing number after THEN")
+
 
 def fix_array_parens(tokens: list[Token]) -> list[Token]:
     """
@@ -361,6 +394,7 @@ def translate_assignment(tokens: list[Token]) -> str:
     tokens = fix_array_parens(tokens)
     return ''.join(t.str_value for t in tokens)
 
+
 def translate_for(tokens: list[Token]) -> str:
     """
     Examples:
@@ -385,6 +419,7 @@ def translate_for(tokens: list[Token]) -> str:
         rval += token.str_value
     return rval
 
+
 def translate_next(tokens: list[Token]) -> str:
     """
     Could be a bare NEXT
@@ -398,8 +433,9 @@ def translate_next(tokens: list[Token]) -> str:
     if len(tokens) == 1:
         return 'NEXT'
     elif len(tokens) == 2:
-        return 'NEXT.'+tokens[1].str_value
+        return 'NEXT.' + tokens[1].str_value
     raise SyntaxError('Too many tokens after NEXT')
+
 
 def translate_goto(tokens: list[Token]) -> str:
     """
@@ -412,13 +448,14 @@ def translate_goto(tokens: list[Token]) -> str:
     assert tokens[0].str_value == Keyword.GOTO.name
     if len(tokens) != 2:
         raise SyntaxError('Malformed GOTO')
-    return 'GOTO._'+tokens[1].str_value
+    return 'GOTO._' + tokens[1].str_value
+
 
 def translate_tokens(tokens: list[Token]) -> str:
     rval = ''
     i = 0
     if tokens[0].tok_type == Type.Integer:  # line number
-        rval += '_'+tokens[0].str_value+". "
+        rval += '_' + tokens[0].str_value + ". "
         i = 1
         if len(tokens) == 1:
             raise SyntaxError('Line number with no line')
@@ -441,10 +478,10 @@ def translate_tokens(tokens: list[Token]) -> str:
         elif token.str_value == Keyword.END.name or token.str_value == Keyword.STOP.name:
             rval += token.str_value
         else:
-            raise SyntaxError('Unknown keyword: '+token.str_value)
+            raise SyntaxError('Unknown keyword: ' + token.str_value)
     elif token.tok_type == Type.Comment:
         if token.str_value:
-            rval += "REM #"+token.str_value
+            rval += "REM #" + token.str_value
         else:
             rval += 'REM'
     elif token.tok_type == Type.Variable:  # assignment
@@ -460,15 +497,17 @@ def translate_basic_line(raw_line: str) -> list[str]:
 
     token_lines = separate_token_lines(tokens)
     for line in token_lines:
-        #print(line)
+        # print(line)
         lines.append(translate_tokens(line))
     return lines
+
 
 def read_basic(basic_lines: list[str]) -> list[str]:
     rval = []
     for line in basic_lines:
         rval.extend(translate_basic_line(line))
     return rval
+
 
 def translate_file(fname: str) -> None:
     """
@@ -492,19 +531,21 @@ if __name__ == '__main__':
     lines = read_basic(open(fname).readlines())
     # I'm happy with foo.bas.py as a filename
     # It's less likely to be confused with a real python file.
-    pyname = fname+'.py'
+    pyname = fname + '.py'
     func_name = fname.split('.')[0]
-    func_name = 'basic_'+func_name  # some files start with a digit
-    with open(pyname,'w') as fid:
+    func_name = 'basic_' + func_name  # some files start with a digit
+    with open(pyname, 'w') as fid:
         print(header.format(name=func_name), file=fid)
         for line in lines:
-            print('    '+line, file=fid)
+            print('    ' + line, file=fid)
         print(footer.format(name=func_name), file=fid)
 
+
 if __name__ == '__main__':
-    #tokenise('5 PRINT TAB(33);"BAGELS"')
-    #lines = read_basic(open("bagels.bas").readlines())
-    #for line in lines:
+    #print(tokenise('5 PRINT TAB(33);"BAGELS"'))
+    # lines = read_basic(open("bagels.bas").readlines())
+    # for line in lines:
     #    print(line)
-    #print("Hello")
-    translate_file('23matches.bas')
+    # print("Hello")
+    # translate_file('23matches.bas')
+    translate_file('bagels.bas')

@@ -3,7 +3,7 @@ from basic import basic
 from basic_functions import *
 
 @basic
-def bagels():
+def basic_bagels():
     
     _5. PRINT(TAB(33),"BAGELS")
     _10. PRINT(TAB(15),"CREATIVE COMPUTING  MORRISTOWN, NEW JERSEY")
@@ -11,7 +11,7 @@ def bagels():
     PRINT
     _15. REM # *** BAGLES NUMBER GUESSING GAME
     _20. REM # *** ORIGINAL SOURCE UNKNOWN BUT SUSPECTED TO BE
-    _25. REM # *** LAWRENCE HALL OF SCIENCE, U.C. BERKELY
+    _25. REM # *** LAWRENCE HALL OF SCIENCE, U.C. BERKELEY
     _30. DIM.A1(6),A(3),B(3)
     _40. Y=0
     T=255
@@ -83,7 +83,7 @@ def bagels():
     _600. PRINT
     _605. NEXT.I
     _610. PRINT("OH WELL.")
-    _615. PRINT("THAT'S TWNETY GUESSES.  MY NUMBER WAS",100*A(1)+10*A(2)+A(3))
+    _615. PRINT("THAT'S TWENTY GUESSES.  MY NUMBER WAS",100*A(1)+10*A(2)+A(3))
     _620. GOTO._700
     _630. PRINT("TRY GUESSING A THREE-DIGIT NUMBER.")
     GOTO._230
@@ -94,7 +94,7 @@ def bagels():
     PRINT
     _690. Y=Y+1
     _700. INPUT("PLAY AGAIN (YES OR NO)").Astr
-    _720. IF(LEFT(Astr,1)=="YES").THEN._150
+    _720. IF(LEFT(Astr,1)=="Y").THEN._150
     _730. IF(Y==0).THEN._750
     _740. PRINT
     PRINT("A",Y,"POINT BAGELS BUFF!!")
@@ -103,5 +103,5 @@ def bagels():
 
 
 if __name__ == '__main__':
-    bagels()
+    basic_bagels()
     
