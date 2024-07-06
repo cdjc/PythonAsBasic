@@ -1,7 +1,4 @@
 import unittest
-from basic import basic
-import io
-import sys
 
 from basic_to_python import *
 class TestTranslate(unittest.TestCase):
