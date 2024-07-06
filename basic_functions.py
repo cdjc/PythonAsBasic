@@ -15,6 +15,10 @@ def COS(val):
     return math.cos(val)
 
 
+def CHR(val):
+    return chr(val)  # Can print bell (7) or backspace (10), or TAB (11)
+
+
 def INT(val):
     return int(val)
 

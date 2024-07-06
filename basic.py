@@ -47,9 +47,11 @@ re_if_stmt = re.compile(r"IF\((?P<expr>.*)\)\.THEN\.(?P<stmt>.*)")
 re_for_stmt = re.compile(r"FOR\.(?P<var>[A-Z][A-Z0-9]*)\s*=\s*\((?P<expr_from>.*),\s*TO,\s*(?P<expr_to>.*)\)")
 re_next_stmt = re.compile(r'NEXT\.[A-Z][A-Z0-9]*')
 re_goto_stmt = re.compile(r'GOTO\._[1-9][0-9]*')
+re_gosub_stmt = re.compile(r'GOSUB\._[1-9][0-9]*')
 re_rem_stmt = re.compile(r'REM\.*')
 re_end_stmt = re.compile(r'END')
 re_stop_stmt = re.compile(r'STOP')
+re_return_stmt = re.compile(r'RETURN')
 
 # expression rewriting
 #re_left_fn = re.compile(r'LEFT\(\s*(?P<var>[A-Z][A-Z0-9]*)\s*,\s*(?P<len>\d+\s*)\)')
@@ -61,9 +63,16 @@ re_mid_fn = re.compile(r'MID\((?P<expr_str>.*),(?P<expr_start>.*), (?P<expr_end>
 for_stack = []
 for_counter = 0
 
-
+return_targets = []
+next_line_is_return_target = False
+return_stmt_nodes = []  # The return statement node
+# the node with the ast.Constant which will need to be replaced by the target of the return after a gosub
+# i.e. the label of the next line after the gosub
+gosub_return_target_nodes = []
 def rewrite_statement(node: ast.AST):
-    global for_counter
+    global for_counter, return_targets, return_stmt_nodes, next_line_is_return_target
+    global gosub_return_target_nodes
+    gosub_return_stmt = False
 
     raw_line = ast.unparse(node)
 
@@ -79,6 +88,9 @@ def rewrite_statement(node: ast.AST):
     else:
         line = raw_line
 
+    if line_no_str and next_line_is_return_target:
+        return_targets.append(line_no_str)
+        next_line_is_return_target = False
 
     # print(line_no_str,'->',line)
 
@@ -183,12 +195,19 @@ def rewrite_statement(node: ast.AST):
         line_end = f'label .{post_for_label}'
 
         new_line = '\n'.join((line_incr, line_goto, line_end))
+    elif match := re_gosub_stmt.fullmatch(line):
+        new_line = f"_gosub_stack.append('FILLMEIN')\n"
+        new_line += line.replace('GOSUB', 'goto')
+        next_line_is_return_target = True
+    elif match := re_return_stmt.fullmatch(line):
+        gosub_return_stmt = True
+        new_line = "return"  # marker to find and replace later
     elif match := re_goto_stmt.fullmatch(line):
         new_line = line.replace('GOTO', 'goto')
     elif match := re_rem_stmt.fullmatch(line):
         new_line = line.replace('REM', 'pass #')
     elif match := re_end_stmt.fullmatch(line):
-        new_line = line.replace('END', 'return')
+        new_line = line.replace('END', 'if __name__: return')
     elif match := re_stop_stmt.fullmatch(line):
         new_line = line.replace('STOP', 'return')
     else:
@@ -209,6 +228,15 @@ def rewrite_statement(node: ast.AST):
     new_nodes = new_module.body
     for new_node in new_nodes:
         fix_line_nos(new_node, node)
+        if gosub_return_stmt and type(new_node) is ast.Return:
+            return_stmt_nodes.append(new_node)
+            gosub_return_stmt = False
+        if next_line_is_return_target and \
+                type(new_node) is ast.Expr and \
+                type(new_node.value) is ast.Call and \
+                type(new_node.value.args[0]) is ast.Constant:
+            gosub_return_target_nodes.append(new_node.value.args[0])
+
     return new_nodes
 
 def fix_line_nos(to_node: ast.AST, from_node: ast.AST):
@@ -224,6 +252,56 @@ def fix_line_nos(to_node: ast.AST, from_node: ast.AST):
     for child_node in ast.iter_child_nodes(to_node):
         fix_line_nos(child_node, to_node)
 
+
+def fix_up_return_statements(allnodes: list[ast.AST]) -> list[ast.AST]:
+    """
+    We don't know what GOSUB we came from, so we need to look at the GOSUB stack
+    to see what the most recent RETURN target is, and GOTO that.
+    :return:
+    """
+    global return_targets, return_stmt_nodes
+    rval = []
+    for i, node in enumerate(allnodes):
+        if node not in return_stmt_nodes:
+            rval.append(node)
+            continue
+        line = '_target = _gosub_stack.pop()\n'
+        for target in return_targets:
+            line += f'if _target == "{target}": goto.{target}\n'
+        new_module = ast.parse(line, __name__, mode='exec')
+        new_nodes = new_module.body
+        for new_node in new_nodes:
+            fix_line_nos(new_node, node)
+
+        rval.extend(new_nodes)
+    return rval
+
+def fix_up_gosub_return_targets():
+    """
+    When we first see a GOSUB, we don't know the next line (the line after the GOSUB)
+    that the RETURN should come back to. So put in a placeholder and fix it here.
+    :return:
+    """
+    global return_targets, gosub_return_target_nodes
+    assert len(return_targets) == len(gosub_return_target_nodes)
+    for return_target,constant_ast in zip (return_targets, gosub_return_target_nodes):
+        constant_ast : ast.Constant
+        constant_ast.value = return_target
+
+
+def make_header_ast(fn_node):
+    """
+    Required at the start of each function
+    """
+
+    header = """_gosub_stack = []"""
+    new_module = ast.parse(header, __name__, mode='exec')
+    new_nodes = new_module.body
+    for new_node in new_nodes:
+        fix_line_nos(new_node, fn_node)
+    return new_nodes
+
+
 def process_statements(root: ast.Module):
     '''
     Process each statement for transformation
@@ -233,11 +311,15 @@ def process_statements(root: ast.Module):
     checkModule(root)
     fn = root.body[0]
     checkFunctionDef(fn)
-    nodes = [] #= make_header_ast(fn)
+    nodes = make_header_ast(fn)
     for statement in fn.body:
         #print('!',ast.unparse(statement))
         nodes.extend(rewrite_statement(statement))
         #nodes.extend(process_basic_statement(statement))
+    print(return_targets, return_stmt_nodes)
+    print(gosub_return_target_nodes)
+    fix_up_gosub_return_targets()
+    nodes = fix_up_return_statements(nodes)
     fn.body = nodes
     print(ast.unparse(fn))
 
@@ -287,7 +369,9 @@ if __name__ == '__main__':
     @basic
     def prnt():
         _10. FOR.I=1,TO,2
+        _12. GOSUB._70
         _15. FOR.J=4,TO,5
+        _18. GOSUB._90
         _20. PRINT(I,J)
         _40. NEXT.J
         _30. NEXT.I
@@ -297,5 +381,9 @@ if __name__ == '__main__':
         print(A,A,A)
         #_56. PRINT(D)
         _60. END
+        _70. PRINT("SUB 1")
+        _80. RETURN
+        _90. PRINT("SUB 2")
+        _100. RETURN
 
     prnt()
