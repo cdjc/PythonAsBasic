@@ -9,8 +9,8 @@ import pathlib
 
 class Type(Enum):
     String = auto()
-    Integer = auto()
-    Float = auto()
+    Number = auto()
+    #Float = auto()  we'll just use Number for Integer and float
     Variable = auto()
     Keyword = auto()
     Function = auto()
@@ -98,12 +98,16 @@ def tokenise(line: str) -> list[Token]:
             line = line[ws.end():]
             continue
 
-        digits = re.match(r'\d+', line)
-        if digits is not None:
-            rval.append(Token(tok_type=Type.Integer,
-                              str_value=digits.group(),
-                              num_value=int(digits.group())))
-            line = line[digits.end():]
+
+        float_match = re.match(r'[+-]?(\d+(\.\d*)?|\.\d+)([E][+-]?\d+)?', line)
+        if float_match is not None:
+            float_num = float(float_match.group())
+            if float_num == int(float_num):
+                float_num = int(float_num)
+            rval.append(Token(tok_type=Type.Number,
+                              str_value=float_match.group(),
+                              num_value=float(float_match.group())))
+            line = line[float_match.end():]
             continue
 
         word_match = re.match(r'[A-Z]+', line)
@@ -191,8 +195,7 @@ def tokenise(line: str) -> list[Token]:
             line = line[var_match.end():]
             continue
 
-        print("Unknown tokens:", line)
-        sys.exit(1)
+        raise TranslationError("Unknown tokens:"+line)
 
     return rval
 
@@ -319,7 +322,7 @@ def translate_if(tokens: list[Token]) -> str:
     # print(tokens)
     for token in tokens:
         if seen_then:
-            if token.tok_type != Type.Integer:
+            if token.tok_type != Type.Number:
                 # TODO For now, assume there's only a number after the THEN.
                 raise TranslationError("Non numerical THENs not yet implemented")
             rval += '_' + token.str_value
@@ -453,10 +456,22 @@ def translate_goto(tokens: list[Token]) -> str:
     return 'GOTO._' + tokens[1].str_value
 
 
+def translate_gosub(tokens: list[Token]) -> str:
+    """
+    GOSUB.
+
+    All the hard work is in basic.py
+    """
+    assert tokens[0].str_value == Keyword.GOSUB.name
+    if len(tokens) != 2:
+        raise SyntaxError('Malformed GOTO')
+    return 'GOSUB._' + tokens[1].str_value
+
+
 def translate_tokens(tokens: list[Token]) -> str:
     rval = ''
     i = 0
-    if tokens[0].tok_type == Type.Integer:  # line number
+    if tokens[0].tok_type == Type.Number:  # line number
         rval += '_' + tokens[0].str_value + ". "
         i = 1
         if len(tokens) == 1:
@@ -477,7 +492,11 @@ def translate_tokens(tokens: list[Token]) -> str:
             rval += translate_next(tokens[i:])
         elif token.str_value == Keyword.GOTO.name:
             rval += translate_goto(tokens[i:])
-        elif token.str_value == Keyword.END.name or token.str_value == Keyword.STOP.name:
+        elif token.str_value == Keyword.GOSUB.name:
+            rval += translate_gosub(tokens[i:])
+        elif token.str_value in (Keyword.END.name,
+                                 Keyword.STOP.name,
+                                 Keyword.RETURN.name):
             rval += token.str_value
         else:
             raise SyntaxError('Unknown keyword: ' + token.str_value)
@@ -549,10 +568,11 @@ if __name__ == '__main__':
 
 
 if __name__ == '__main__':
-    # print(tokenise('5 PRINT TAB(33);"BAGELS"'))
+    #print(tokenise('542 Q=INT(10*(2*RND(1)-.3))'))
     # lines = read_basic(open("bagels.bas").readlines())
     # for line in lines:
     #    print(line)
     # print("Hello")
     # translate_file('23matches.bas')
-    translate_file('bagels.bas')
+    # translate_file('bagels.bas')
+    translate_file('hammurabi.bas')

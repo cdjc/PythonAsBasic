@@ -69,5 +69,13 @@ class TestTranslate(unittest.TestCase):
         self.assertEqual('REM # foo', translate_tokens(tokenise('REM foo')))
         self.assertEqual('REM', translate_tokens(tokenise('REM')))
 
+    def test_float(self):
+        self.assertEqual('_542. Q=INT(10*(2*RND(1)-.3))', translate_tokens(tokenise('542 Q=INT(10*(2*RND(1)-.3))')))
+        self.assertEqual('A=3.14', translate_tokens(tokenise('A=3.14')))
+        self.assertEqual('A=-0.001', translate_tokens(tokenise('A=-0.001')))
+        self.assertEqual('A=1E5', translate_tokens(tokenise('A=1E5')))
+        self.assertEqual('A=1E+5', translate_tokens(tokenise('A=1E+5')))
+        self.assertEqual('A=-.1E-5', translate_tokens(tokenise('A=-.1E-5')))
+
 if __name__ == '__main__':
     unittest.main()
