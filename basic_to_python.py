@@ -575,4 +575,5 @@ if __name__ == '__main__':
     # print("Hello")
     # translate_file('23matches.bas')
     # translate_file('bagels.bas')
-    translate_file('hammurabi.bas')
+    #translate_file('hammurabi.bas')
+    translate_file('example.bas')
