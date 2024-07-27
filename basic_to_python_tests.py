@@ -17,6 +17,10 @@ class TestTranslate(unittest.TestCase):
         with self.assertRaises(SyntaxError):
             translate_tokens(tokenise("A=(5"))
 
+    def test_boolean_expr(self):
+        self.assertEqual('_65. IF(A[I]==3 and A[J]!=5).THEN._95', translate_tokens(tokenise('65 IF A(I)=3 AND A(J)<>5 THEN 95')))
+        # TODO add 'not' and 'or'
+
     def test_print(self):
         self.assertEqual("PRINT", translate_tokens(tokenise("PRINT")))
         self.assertEqual('PRINT("FOO")', translate_tokens(tokenise('PRINT "FOO"')))

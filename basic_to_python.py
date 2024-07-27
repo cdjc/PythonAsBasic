@@ -69,6 +69,9 @@ class Keyword(Enum):
     TO = auto()  # see also FOR
     STOP = auto()
     STEP = auto()  # see also FOR
+    AND = auto()
+    OR = auto()
+    NOT = auto()
 
 
 int_function_names = set(x.name for x in IntFunction)
@@ -315,7 +318,7 @@ def translate_if(tokens: list[Token]) -> str:
 
     # Everything between the IF and the THEN must be converted to IF(y...).THEN
 
-    tokens = fix_array_parens(tokens)
+    tokens = fix_expressions(tokens)
 
     rval = ''
     seen_then = False
@@ -349,11 +352,14 @@ def translate_if(tokens: list[Token]) -> str:
     raise SyntaxError("Missing number after THEN")
 
 
-def fix_array_parens(tokens: list[Token]) -> list[Token]:
+def fix_expressions(tokens: list[Token]) -> list[Token]:
     """
-    Go through the tokens and fix A(X) to A[X]
+    Go through the tokens and
+     1. fix A(X) to A[X]
+     2. Change AND, OR, NOT to and, or, not
 
     Arrays are uniquely identified by a variable followed by a parenthesis
+    Boolean operators are lowercased.
     """
     # loop through the tokens and find all array parens and convert to '[' or ']'
     # The index of the array could be an expression and have parenthetical expressions (or other arrays)
@@ -380,6 +386,9 @@ def fix_array_parens(tokens: list[Token]) -> list[Token]:
                 tokens[i].str_value = ']'
         else:
             could_be_array = False
+            # Fix up booleans
+            if token.tok_type == Type.Keyword and token.str_value in (Keyword.AND.name, Keyword.OR.name, Keyword.NOT.name):
+                tokens[i].str_value = ' '+token.str_value.lower()+' '
     if stack:
         raise SyntaxError("Not enough close parentheses. TODO. Add tokens here")
 
@@ -396,7 +405,7 @@ def translate_assignment(tokens: list[Token]) -> str:
 
     """
 
-    tokens = fix_array_parens(tokens)
+    tokens = fix_expressions(tokens)
     return ''.join(t.str_value for t in tokens)
 
 
@@ -568,7 +577,8 @@ if __name__ == '__main__':
 
 
 if __name__ == '__main__':
-    #print(tokenise('542 Q=INT(10*(2*RND(1)-.3))'))
+    print(tokenise('65 IF A(I)=3 AND A(J)<>5 THEN 95'))
+    print(translate_tokens(tokenise('65 IF A(I)=3 AND A(J)<>5 THEN 95')))
     # lines = read_basic(open("bagels.bas").readlines())
     # for line in lines:
     #    print(line)
@@ -576,4 +586,4 @@ if __name__ == '__main__':
     # translate_file('23matches.bas')
     # translate_file('bagels.bas')
     #translate_file('hammurabi.bas')
-    translate_file('example.bas')
+    # translate_file('example.bas')
