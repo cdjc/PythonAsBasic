@@ -28,11 +28,8 @@ def checkASTNodeType(node: ast.AST, expected: type):
     return node
 
 
-# isModule = lambda n: isASTNodeType(n, ast.Module)
 checkModule = lambda n: checkASTNodeType(n, ast.Module)
-# isFunctionDef = lambda n: isASTNodeType(n, ast.FunctionDef)
 checkFunctionDef = lambda n: checkASTNodeType(n, ast.FunctionDef)
-
 
 re_line_no = re.compile(r'_[1-9][0-9]*')
 re_line_no_prefix = re.compile(r'(_[1-9][0-9]*)\.')
@@ -52,13 +49,6 @@ re_rem_stmt = re.compile(r'REM\.*')
 re_end_stmt = re.compile(r'END')
 re_stop_stmt = re.compile(r'STOP')
 re_return_stmt = re.compile(r'RETURN')
-
-# expression rewriting
-#re_left_fn = re.compile(r'LEFT\(\s*(?P<var>[A-Z][A-Z0-9]*)\s*,\s*(?P<len>\d+\s*)\)')
-re_rand_fn = re.compile(r'RND\([0-9]*\)')
-re_mid_fn = re.compile(r'MID\((?P<expr_str>.*),(?P<expr_start>.*), (?P<expr_end>.*)\)')
-
-
 
 for_stack = []
 for_counter = 0
